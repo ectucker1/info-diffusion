@@ -1,11 +1,14 @@
 import datetime
+import logging
 import os
+from itertools import count
 from time import sleep
 
 import tweepy
 from selenium import webdriver
 from selenium.common.exceptions import (NoSuchElementException,
                                         StaleElementReferenceException)
+from sqlitedict import SqliteDict
 
 from .exception import WebBrowserError, WebDriverError
 from .utils import sentiment, split_text
@@ -245,7 +248,8 @@ class Tweet(object):
 
         return self.tweet['user']['id_str']
 
-    def original_owner_id(self, tweet_dataset):
+    @property
+    def original_owner_id(self):
         """ this method should be called if the tweet is either a retweet or
         quoted.
 
@@ -262,35 +266,19 @@ class Tweet(object):
             user_id {[type]} -- [description]
             tweet {[type]} -- [description]
         """
-        if not self.is_retweeted_tweet and not self.is_quoted_tweet:
-            return self.owner_id
 
         if self.is_retweeted_tweet:
-            if self.users_mentioned:
-                return self.users_mentioned[0]
-            else:
-                return 0
+            tweet_ = self.tweet['retweeted_status']
+            return tweet_['user']['id_str']
 
         if self.is_quoted_tweet:
-            orig_tweet_id = self.tweet['quoted_status_id_str']
+            tweet_ = self.tweet['quoted_status']
+            return tweet_['user']['id_str']
 
-            # check if the original_tweet is part of tweet dataset Graph G
-            # if yes, then add to possible original tweet owner who is
-            # also supposed to be in G
-            if orig_tweet_id in tweet_dataset:
-                # this may change depending on whether tweet was stored as
-                # Status object or json
-                user_id_of_original_tweet = tweet_dataset[orig_tweet_id].id_str
-                return user_id_of_original_tweet
-            else:
-                # raise KeyError('Original_tweet_id not in tweet dataset')
-                return 0
+        if self.tweet['in_reply_to_user_id_str'] is not None:
+            return self.tweet['in_reply_to_user_id_str']
 
-        if self.is_retweeted_tweet and self.is_quoted_tweet:
-            # this is just for debugging purpose to make sure that a tweet
-            # cannot both be a retweeted and quoted tweet
-            raise ValueError("Tweet cannot be a retweeted and quoted tweet at "
-                             "the same time")
+        return self.owner_id
 
     @property
     def is_retweeted_tweet(self):
@@ -310,7 +298,7 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return True if 'quoted_status_id_str' in self.tweet else False
+        return True if 'quoted_status' in self.tweet else False
 
     @property
     def hashtags(self):
@@ -430,3 +418,59 @@ class Tweet(object):
         """
 
         return self.tweet['user']['friends_count']
+
+
+def get_user_tweets_and_build_tables(api, user_id, days, database_file_path,
+                                     tablename='tweet-objects'):
+
+    """Fetch all tweets by a user....(((( we may need to include keywords to
+    fetch only tweets with related keywords"""
+
+    today = datetime.datetime.today()
+    print(">>  Processing {}'s tweets....".format(user_id))
+
+    # there is still need for test for users who have not tweeted within the
+    # specified number of days
+    with SqliteDict(database_file_path, tablename=tablename) as tweets_table:
+        for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
+                                                          id=user_id).items()):
+            # process status here
+            if counter % 100 == 0 and counter != 0:
+                print(f'>>  Over {counter} tweets have been retrieved so far'
+                      f'..USER ID: {user_id}')
+
+            difference = (today - status.created_at).days
+
+            if difference >= days + 1:
+                break
+            else:
+                tweet_id = status.id_str
+                # if this doesn't wort, try its private json extension
+                tweets_table[tweet_id] = status
+                tweets_table.commit()
+
+    logging.info(f'Total number of tweets retrieved from {user_id}: {counter}')
+    return counter
+
+
+def get_all_tweets_in_network_and_build_tables(api, user_ids, days,
+                                               database_file_path,
+                                               tablename='tweet-objects'):
+    total = len(user_ids)
+    counter = 0
+    error_ids = set()
+    for i, user_id in zip(count(start=1), enumerate(user_ids)):
+        logging.info(f"PROCESSING {i} OF {total} USERS")
+        try:
+            ct = get_user_tweets_and_build_tables(
+                api, user_id, days, database_file_path, tablename=tablename)
+
+            if not ct:
+                raise tweepy.TweepError('0 tweet was fetched and would add '
+                                        f'{user_id} to error ids')
+            counter += ct
+        except tweepy.TweepError as e:
+            print("XXXX Skipped {}, {}.\n".format(user_id, e))
+            error_ids.add(user_id)
+
+    return counter, error_ids

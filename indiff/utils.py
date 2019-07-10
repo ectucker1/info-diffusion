@@ -9,10 +9,8 @@ import random
 import re
 import string
 from itertools import count
-import logging
 
 import pandas as pd
-import tweepy
 from nltk.corpus import stopwords
 from nltk.tokenize import TweetTokenizer
 from sqlitedict import SqliteDict
@@ -35,62 +33,6 @@ def get_keywords_from_file(keywords_file):
             keywords.add(line.lower())
 
     return keywords
-
-
-def get_user_tweets_and_build_tables(api, user_id, days, database_file_path,
-                                     tablename='tweet-objects'):
-
-    """Fetch all tweets by a user....(((( we may need to include keywords to
-    fetch only tweets with related keywords"""
-
-    today = datetime.datetime.today()
-    print(">>  Processing {}'s tweets....".format(user_id))
-
-    # there is still need for test for users who have not tweeted within the
-    # specified number of days
-    with SqliteDict(database_file_path, tablename=tablename) as tweets_table:
-        for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
-                                                          id=user_id).items()):
-            # process status here
-            if counter % 100 == 0 and counter != 0:
-                print(f'>>  Over {counter} tweets have been retrieved so far'
-                      f'..USER ID: {user_id}')
-
-            difference = (today - status.created_at).days
-
-            if difference >= days + 1:
-                break
-            else:
-                tweet_id = status.id_str
-                # if this doesn't wort, try its private json extension
-                tweets_table[tweet_id] = status
-                tweets_table.commit()
-
-    logging.info(f'Total number of tweets retrieved from {user_id}: {counter}')
-    return counter
-
-
-def get_all_tweets_in_network_and_build_tables(api, user_ids, days,
-                                               database_file_path,
-                                               tablename='tweet-objects'):
-    total = len(user_ids)
-    counter = 0
-    error_ids = set()
-    for i, user_id in zip(count(start=1), enumerate(user_ids)):
-        logging.info(f"PROCESSING {i} OF {total} USERS")
-        try:
-            ct = get_user_tweets_and_build_tables(
-                api, user_id, days, database_file_path, tablename=tablename)
-
-            if not ct:
-                raise tweepy.TweepError('0 tweet was fetched and would add '
-                                        f'{user_id} to error ids')
-            counter += ct
-        except tweepy.TweepError as e:
-            print("XXXX Skipped {}, {}.\n".format(user_id, e))
-            error_ids.add(user_id)
-
-    return counter, error_ids
 
 
 def split_text(tweet_text):
