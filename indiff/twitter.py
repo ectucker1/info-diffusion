@@ -453,17 +453,19 @@ def get_user_tweets_and_build_tables(api, user_id, days, database_file_path,
     return counter
 
 
-def get_all_tweets_in_network_and_build_tables(api, user_ids, days,
+def get_all_tweets_in_network_and_build_tables(api, user_ids,
                                                database_file_path,
-                                               tablename='tweet-objects'):
+                                               tablename='tweet-objects',
+                                               n_item=5000, days=30):
     total = len(user_ids)
     counter = 0
     error_ids = set()
-    for i, user_id in zip(count(start=1), enumerate(user_ids)):
+    for i, user_id in zip(count(start=1), user_ids):
         logging.info(f"PROCESSING {i} OF {total} USERS")
         try:
-            ct = get_user_tweets_and_build_tables(
-                api, user_id, days, database_file_path, tablename=tablename)
+            ct = get_max_user_tweets_and_build_tables(api, user_id,
+                                                      database_file_path,
+                                                      tablename=tablename)
 
             if not ct:
                 raise tweepy.TweepError('0 tweet was fetched and would add '
@@ -474,3 +476,32 @@ def get_all_tweets_in_network_and_build_tables(api, user_ids, days,
             error_ids.add(user_id)
 
     return counter, error_ids
+
+
+def get_max_user_tweets_and_build_tables(api, user_id, database_file_path,
+                                         tablename='tweet-objects',
+                                         n_times=5000):
+
+    """Fetch all tweets by a user....(((( we may need to include keywords to
+    fetch only tweets with related keywords"""
+
+    print(">>  Processing {}'s tweets....".format(user_id))
+
+    # there is still need for test for users who have not tweeted within the
+    # specified number of days
+    with SqliteDict(database_file_path, tablename=tablename) as tweets_table:
+        for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
+                                                          id=user_id).items(
+                                                              n_times)):
+            # process status here
+            if counter % 500 == 0 and counter != 0:
+                print(f'>>  Over {counter} tweets have been retrieved so far'
+                      f'..USER ID: {user_id}')
+
+            tweet_id = status.id_str
+            # if this doesn't wort, try its private json extension
+            tweets_table[tweet_id] = status
+            tweets_table.commit()
+
+    logging.info(f'Total number of tweets retrieved from {user_id}: {counter}')
+    return counter
