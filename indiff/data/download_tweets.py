@@ -74,9 +74,11 @@ def main(input, start, end, browser, bdriver):
         access_token = os.environ.get('ACCESS_TOKEN')
         access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET')
 
-        api = API(consumer_key=consumer_key, consumer_secret=consumer_secret,
-                  access_token=access_token,
-                  access_token_secret=access_token_secret).authenticate()
+        auth = API(consumer_key=consumer_key, consumer_secret=consumer_secret,
+                   access_token=access_token,
+                   access_token_secret=access_token_secret)
+
+        api = auth()
 
         # build initial graph from file
         social_network = nx.read_edgelist(input, delimiter=',',
