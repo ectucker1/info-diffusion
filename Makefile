@@ -39,6 +39,24 @@ clean:
 lint:
 	flake8 indiff
 
+## Delete given topic data
+clean_data:
+	rm -rf data/raw/$(TOPIC)
+	rm -rf data/processed/$(TOPIC)
+	rm -rf reports/$(TOPIC)
+
+## Delete all generated data
+clean_all:
+	rm -rf data/raw/*
+	rm -rf data/processed/*
+	rm -rf data/interim/*
+	rm -rf data/external/*
+	rm -rf models/*
+	rm -rf notebooks/*
+	rm -rf references/*
+	rm -rf reports/*
+
+
 ## Upload Data to S3
 sync_data_to_s3:
 ifeq (default,$(PROFILE))
