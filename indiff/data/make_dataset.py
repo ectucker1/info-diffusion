@@ -8,13 +8,14 @@ import click
 import networkx as nx
 import pandas as pd
 import progressbar
+import requests
 from dotenv import find_dotenv, load_dotenv
 from sqlitedict import SqliteDict
 
 from indiff import utils
 from indiff.features import build_features
-from indiff.twitter import Tweet
-# from indiff.data import download_tweets
+from indiff.twitter import (API, Tweet,
+                            get_all_tweets_in_network_and_build_tables)
 
 
 @click.command()
@@ -27,216 +28,299 @@ def main(input_filepath, keywords):
 
     current_date_and_time = datetime.datetime.now()
 
-    input_filepath = Path(input_filepath)
-    if not input_filepath.is_absolute():
-        raise ValueError('Expected an absolute path.')
-    if not input_filepath.is_dir():
-        raise ValueError('input_filepath path is not a directory.')
+    # root directories
+    root_dir = Path(__file__).resolve().parents[2]
+    datastore_root_dir = os.path.join(root_dir, 'data', 'raw')
+    filename, _ = os.path.splitext(os.path.basename(input_filepath))
 
-    parts = list(input_filepath.parts)
-    parts[7] = 'processed'
-    processed_path = Path(*parts)
-    if not os.path.exists(processed_path):
-        os.makedirs(processed_path)
+    # make directories of year/month/day-of-crawl/time-of-crawl=hr-mins
+    # todo: correctly break the next line
+    # additional_filename = f'{current_date_and_time.year}/'\
+    #    f'{current_date_and_time.month}/{current_date_and_time.day}/'\
+    #    f'{current_date_and_time.hour}-{current_date_and_time.minute}'
 
-    graph_filepath = list(input_filepath.glob('*.adjlist'))[0]
-    database_filepath = list(input_filepath.glob('*.sqlite'))[0]
+    dataset_dir = os.path.join(datastore_root_dir, filename)
 
-    # infer path to write corresponding reports
-    # change 'data' to 'reports'
-    # reomve 'raw' from original path
-    parts = list(input_filepath.parts)
-    parts[6] = 'reports'
-    parts.pop(7)
-    reports_filepath = Path(*parts)
+    database_file_path = os.path.join(dataset_dir, f'{filename}-tweets.sqlite')
 
-    # get tweet ids that fulfil the date range of interest
-    with SqliteDict(filename=database_filepath.as_posix(),
-                    tablename='tweet-objects') as tweets:
+    logger = logging.getLogger(__name__)
 
-        logging.info("Load graph from file")
-        social_network = nx.read_adjlist(graph_filepath.as_posix(),
-                                         delimiter=',',
-                                         create_using=nx.DiGraph())
+    url = "http://example.com/"
+    timeout = 5
 
-        # initialise node attributes to have desired info from dataset
-        for user_id in nx.nodes(social_network):
-            attr = {user_id: {'tweets': dict(),
-                              'tweets_with_hashtags': dict(),
-                              'tweets_with_urls': dict(),
-                              'tweets_with_media': dict(),
-                              'users_who_mentioned_me': set(),
-                              'tweets_with_others_mentioned_count': 0,
-                              'mentioned_in': set(),
-                              'users_mentioned_in_all_my_tweets': set(),
-                              'keywords_in_all_my_tweets': set(),
-                              'all_possible_original_tweet_owners': set(),
-                              'retweeted_tweets': dict(),
-                              'retweeted_tweets_with_hashtags': dict(),
-                              'retweeted_tweets_with_urls': dict(),
-                              'retweeted_tweets_with_media': dict(),
-                              'users_mentioned_in_all_my_retweets': set(),
-                              'retweets_with_others_mentioned_count': 0,
-                              'retweet_count': 0,
-                              'retweeted_count': 0,
-                              'quoted_tweets': dict(),
-                              'quoted_tweets_with_hashtags': dict(),
-                              'quoted_tweets_with_urls': dict(),
-                              'quoted_tweets_with_media': dict(),
-                              'users_mentioned_in_all_my_quoted_tweets': set(),
-                              'quoted_tweets_with_others_mentioned_count': 0,
-                              'description': None,
-                              'favorite_tweets_count': 0,
-                              'positive_sentiment_count': 0,
-                              'negative_sentiment_count': 0,
-                              'followers_count': 0,
-                              'friends_count': 0,
-                              'followers_ids': [],
-                              'friends_ids': [],
-                              'tweet_min_date': 0,
-                              'tweet_max_date': 0,
-                              }
-                    }
+    try:
+        if os.path.exists(dataset_dir):
+            raise FileExistsError(f'Dataset for {filename} already exists.')
 
-            nx.set_node_attributes(social_network, attr)
+        # test internet conncetivity is active
+        req = requests.get(url, timeout=timeout)
+        req.raise_for_status()
 
-        keywords = utils.get_keywords_from_file(keywords)
+        # prepare credentials for accessing twitter API
+        consumer_key = os.environ.get('CONSUMER_KEY')
+        consumer_secret = os.environ.get('CONSUMER_SECRET')
+        access_token = os.environ.get('ACCESS_TOKEN')
+        access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET')
 
-        # iterate over the tweets dataset to fetch desired result for nodes
-        bar = progressbar.ProgressBar(
-            maxval=len(tweets),
-            prefix='Computing Node Attributes ').start()
-        for i, (tweet_id, status) in enumerate(tweets.items()):
-            tweet = Tweet(status._json)
-            user_id = tweet.owner_id
+        auth = API(consumer_key=consumer_key, consumer_secret=consumer_secret,
+                   access_token=access_token,
+                   access_token_secret=access_token_secret)
 
-            user = social_network._node[tweet.owner_id]
+        api = auth()
 
-            user['followers_count'] = tweet.owner_followers_count
-            user['friends_count'] = tweet.owner_friends_count
+        # build initial graph from file
+        social_network = nx.read_edgelist(input_filepath, delimiter=',',
+                                          create_using=nx.DiGraph())
+    except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
+        logger.error(error)
+    except requests.HTTPError as e:
+        logger.error(
+            "Checking internet connection failed, status code {0}".format(
+                e.response.status_code
+                )
+            )
+    except requests.ConnectionError:
+        logger.error("No internet connection available.")
+    else:
+        nodes = social_network.nodes()
 
-            orig_owner_id = tweet.original_owner_id
-            if orig_owner_id != user_id:
-                user['all_possible_original_tweet_owners'].add(orig_owner_id)
+        if not os.path.exists(dataset_dir):
+            os.makedirs(dataset_dir)
 
-            user_description = tweet.owner_description
+        logger.info('downloading data set from raw data')
+        tweet_count, error_ids = get_all_tweets_in_network_and_build_tables(
+            api, user_ids=nodes, database_file_path=database_file_path)
 
-            if user_description:
-                user['description'] = user_description
+        social_network.remove_nodes_from(error_ids)
 
-            if tweet.is_retweeted_tweet:
-                user['retweeted_tweets'][tweet_id] = tweet
+        nx.write_adjlist(social_network,
+                         os.path.join(dataset_dir, f'{filename}.adjlist'),
+                         delimiter=',')
 
-                if tweet.hashtags:
-                    user['retweeted_tweets_with_hashtags'][tweet_id] = tweet
-                if tweet.urls:
-                    user['retweeted_tweets_with_urls'][tweet_id] = tweet
-                if tweet.media:
-                    user['retweeted_tweets_with_media'][tweet_id] = tweet
+        social_network.name = filename
 
-                users_mentioned_in_tweet = tweet.users_mentioned
-                user['users_mentioned_in_all_my_retweets'].update(
-                    users_mentioned_in_tweet)
+        dataset_filepath = Path(dataset_dir)
+        parts = list(dataset_filepath.parts)
+        parts[6] = 'reports'
+        parts.pop(7)
+        reports_filepath = Path(*parts)
 
-                if tweet.is_others_mentioned:
-                    user['retweets_with_others_mentioned_count'] += 1
+        if not os.path.exists(reports_filepath):
+            os.makedirs(reports_filepath)
 
-            elif tweet.is_quoted_tweet:
-                user['quoted_tweets'][tweet_id] = tweet
+        graph_info_saveas = os.path.join(reports_filepath,
+                                         f'{filename}-crawl-stats.txt')
+        with open(graph_info_saveas, 'w') as f:
+            f.write(f'###* Info for {filename}, started at '
+                    f'{current_date_and_time}.\n#\n#\n')
+            f.write(nx.info(social_network))
+            f.write(f'\nNumber of tweets: {tweet_count}')
 
-                if tweet.hashtags:
-                    user['quoted_tweets_with_hashtags'][tweet_id] = tweet
-                if tweet.urls:
-                    user['quoted_tweets_with_urls'][tweet_id] = tweet
-                if tweet.media:
-                    user['quoted_tweets_with_media'][tweet_id] = tweet
+        logger.info("Building Features")
+        input_filepath = Path(dataset_dir)
+        if not input_filepath.is_absolute():
+            raise ValueError('Expected an absolute path.')
+        if not input_filepath.is_dir():
+            raise ValueError('input_filepath path is not a directory.')
 
-                users_mentioned_in_tweet = tweet.users_mentioned
-                user['users_mentioned_in_all_my_quoted_tweets'].update(
-                    users_mentioned_in_tweet)
+        parts = list(input_filepath.parts)
+        parts[7] = 'processed'
+        processed_path = Path(*parts)
+        if not os.path.exists(processed_path):
+            os.makedirs(processed_path)
 
-                if tweet.is_others_mentioned:
-                    user['quoted_tweets_with_others_mentioned_count'] += 1
+        database_filepath = list(input_filepath.glob('*.sqlite'))[0]
 
-            else:
-                user['tweets'][tweet_id] = tweet
+        # infer path to write corresponding reports
+        # change 'data' to 'reports'
+        # reomve 'raw' from original path
+        parts = list(input_filepath.parts)
+        parts[6] = 'reports'
+        parts.pop(7)
+        reports_filepath = Path(*parts)
 
-                if tweet.hashtags:
-                    user['tweets_with_hashtags'][tweet_id] = tweet
-                if tweet.urls:
-                    user['tweets_with_urls'][tweet_id] = tweet
-                if tweet.media:
-                    user['tweets_with_media'][tweet_id] = tweet
+        # get tweet ids that fulfil the date range of interest
+        with SqliteDict(filename=database_filepath.as_posix(),
+                        tablename='tweet-objects') as tweets:
 
-                users_mentioned_in_tweet = tweet.users_mentioned
-                user['users_mentioned_in_all_my_tweets'].update(
-                    users_mentioned_in_tweet)
+            # initialise node attributes to have desired info from dataset
+            for user_id in nx.nodes(social_network):
+                attr = {user_id: {'tweets': dict(),
+                                  'tweets_with_hashtags': dict(),
+                                  'tweets_with_urls': dict(),
+                                  'tweets_with_media': dict(),
+                                  'users_who_mentioned_me': set(),
+                                  'tweets_with_others_mentioned_count': 0,
+                                  'mentioned_in': set(),
+                                  'users_mentioned_in_all_my_tweets': set(),
+                                  'keywords_in_all_my_tweets': set(),
+                                  'all_possible_original_tweet_owners': set(),
+                                  'retweeted_tweets': dict(),
+                                  'retweeted_tweets_with_hashtags': dict(),
+                                  'retweeted_tweets_with_urls': dict(),
+                                  'retweeted_tweets_with_media': dict(),
+                                  'users_mentioned_in_all_my_retweets': set(),
+                                  'retweets_with_others_mentioned_count': 0,
+                                  'retweet_count': 0,
+                                  'retweeted_count': 0,
+                                  'quoted_tweets': dict(),
+                                  'quoted_tweets_with_hashtags': dict(),
+                                  'quoted_tweets_with_urls': dict(),
+                                  'quoted_tweets_with_media': dict(),
+                                  'users_mentioned_in_all_my_quoted_tweets': set(),
+                                  'quoted_tweets_with_others_mentioned_count': 0,
+                                  'description': None,
+                                  'favorite_tweets_count': 0,
+                                  'positive_sentiment_count': 0,
+                                  'negative_sentiment_count': 0,
+                                  'followers_count': 0,
+                                  'friends_count': 0,
+                                  'followers_ids': [],
+                                  'friends_ids': [],
+                                  'tweet_min_date': 0,
+                                  'tweet_max_date': 0,
+                                  }
+                        }
 
-                if tweet.is_others_mentioned:
-                    user['tweets_with_others_mentioned_count'] += 1
+                nx.set_node_attributes(social_network, attr)
 
-            if tweet.is_favourited:
-                user['favorite_tweets_count'] += 1
+            keywords = utils.get_keywords_from_file(keywords)
 
-            if users_mentioned_in_tweet:
-                for other_user in users_mentioned_in_tweet:
-                    if other_user in social_network:
-                        social_network._node[other_user]['users_who_mentioned_me'].update(
-                            user_id)
-                        social_network._node[other_user]['mentioned_in'].update(tweet_id)
+            # iterate over the tweets dataset to fetch desired result for nodes
+            bar = progressbar.ProgressBar(
+                maxval=len(tweets),
+                prefix='Computing Node Attributes ').start()
+            for i, (tweet_id, status) in enumerate(tweets.items()):
+                tweet = Tweet(status._json)
+                user_id = tweet.owner_id
 
-            user['retweet_count'] += tweet.retweet_count
+                user = social_network._node[tweet.owner_id]
 
-            if tweet.is_retweeted:
-                user['retweeted_count'] += 1
+                user['followers_count'] = tweet.owner_followers_count
+                user['friends_count'] = tweet.owner_friends_count
 
-            user['keywords_in_all_my_tweets'].update(tweet.keywords)
+                orig_owner_id = tweet.original_owner_id
+                if orig_owner_id != user_id:
+                    user['all_possible_original_tweet_owners'].add(orig_owner_id)
 
-            if user['tweet_min_date'] == 0:
-                user['tweet_min_date'] = tweet.created_at
+                user_description = tweet.owner_description
 
-            if user['tweet_max_date'] == 0:
-                user['tweet_max_date'] = tweet.created_at
+                if user_description:
+                    user['description'] = user_description
 
-            if user['tweet_min_date'] > tweet.created_at:
-                user['tweet_min_date'] = tweet.created_at
+                if tweet.is_retweeted_tweet:
+                    user['retweeted_tweets'][tweet_id] = tweet
 
-            if user['tweet_max_date'] < tweet.created_at:
-                user['tweet_max_date'] = tweet.created_at
+                    if tweet.hashtags:
+                        user['retweeted_tweets_with_hashtags'][tweet_id] = tweet
+                    if tweet.urls:
+                        user['retweeted_tweets_with_urls'][tweet_id] = tweet
+                    if tweet.media:
+                        user['retweeted_tweets_with_media'][tweet_id] = tweet
 
-            # external_owner_id = tweet.original_owner_id
-            # if external_owner_id:
-            #     user['all_possible_original_tweet_owners'].add(
-            #         external_owner_id)
+                    users_mentioned_in_tweet = tweet.users_mentioned
+                    user['users_mentioned_in_all_my_retweets'].update(
+                        users_mentioned_in_tweet)
 
-            # TODO: recalculate for neutral
-            if tweet.is_positive_sentiment:
-                user['positive_sentiment_count'] += 1
-            else:
-                user['negative_sentiment_count'] += 1
-            bar.update(i)
-        bar.finish()
+                    if tweet.is_others_mentioned:
+                        user['retweets_with_others_mentioned_count'] += 1
 
-    # prepare table for dataframe
-    results = build_features.calculate_network_diffusion(
-        nx.edges(social_network), keywords, graph=social_network,
-        additional_attr=True, do_not_add_sentiment=False)
+                elif tweet.is_quoted_tweet:
+                    user['quoted_tweets'][tweet_id] = tweet
 
-    df = pd.DataFrame(results)
+                    if tweet.hashtags:
+                        user['quoted_tweets_with_hashtags'][tweet_id] = tweet
+                    if tweet.urls:
+                        user['quoted_tweets_with_urls'][tweet_id] = tweet
+                    if tweet.media:
+                        user['quoted_tweets_with_media'][tweet_id] = tweet
 
-    # save processed dataset to hdf file
-    key = utils.generate_random_id(length=15)
-    processed_saveas = os.path.join(processed_path, 'dataset.h5')
-    df.to_hdf(processed_saveas, key=key)
+                    users_mentioned_in_tweet = tweet.users_mentioned
+                    user['users_mentioned_in_all_my_quoted_tweets'].update(
+                        users_mentioned_in_tweet)
 
-    if not os.path.exists(reports_filepath):
-        os.makedirs(reports_filepath)
+                    if tweet.is_others_mentioned:
+                        user['quoted_tweets_with_others_mentioned_count'] += 1
 
-    # save key to reports directory
-    key_saveas = os.path.join(reports_filepath, 'dataset.keys')
-    with open(key_saveas, 'a') as f:
-        f.write(f'\n***\n\nmake_dataset.py started at {current_date_and_time}')
-        f.write(f'\nKey: {key}\n\n')
+                else:
+                    user['tweets'][tweet_id] = tweet
+
+                    if tweet.hashtags:
+                        user['tweets_with_hashtags'][tweet_id] = tweet
+                    if tweet.urls:
+                        user['tweets_with_urls'][tweet_id] = tweet
+                    if tweet.media:
+                        user['tweets_with_media'][tweet_id] = tweet
+
+                    users_mentioned_in_tweet = tweet.users_mentioned
+                    user['users_mentioned_in_all_my_tweets'].update(
+                        users_mentioned_in_tweet)
+
+                    if tweet.is_others_mentioned:
+                        user['tweets_with_others_mentioned_count'] += 1
+
+                if tweet.is_favourited:
+                    user['favorite_tweets_count'] += 1
+
+                if users_mentioned_in_tweet:
+                    for other_user in users_mentioned_in_tweet:
+                        if other_user in social_network:
+                            social_network._node[other_user]['users_who_mentioned_me'].update(
+                                user_id)
+                            social_network._node[other_user]['mentioned_in'].update(tweet_id)
+
+                user['retweet_count'] += tweet.retweet_count
+
+                if tweet.is_retweeted:
+                    user['retweeted_count'] += 1
+
+                user['keywords_in_all_my_tweets'].update(tweet.keywords)
+
+                if user['tweet_min_date'] == 0:
+                    user['tweet_min_date'] = tweet.created_at
+
+                if user['tweet_max_date'] == 0:
+                    user['tweet_max_date'] = tweet.created_at
+
+                if user['tweet_min_date'] > tweet.created_at:
+                    user['tweet_min_date'] = tweet.created_at
+
+                if user['tweet_max_date'] < tweet.created_at:
+                    user['tweet_max_date'] = tweet.created_at
+
+                # external_owner_id = tweet.original_owner_id
+                # if external_owner_id:
+                #     user['all_possible_original_tweet_owners'].add(
+                #         external_owner_id)
+
+                # TODO: recalculate for neutral
+                if tweet.is_positive_sentiment:
+                    user['positive_sentiment_count'] += 1
+                else:
+                    user['negative_sentiment_count'] += 1
+                bar.update(i)
+            bar.finish()
+
+        # prepare table for dataframe
+        results = build_features.calculate_network_diffusion(
+            nx.edges(social_network), keywords, graph=social_network,
+            additional_attr=True, do_not_add_sentiment=False)
+
+        df = pd.DataFrame(results)
+
+        # save processed dataset to hdf file
+        key = utils.generate_random_id(length=15)
+        processed_saveas = os.path.join(processed_path, 'dataset.h5')
+        df.to_hdf(processed_saveas, key=key)
+
+        if not os.path.exists(reports_filepath):
+            os.makedirs(reports_filepath)
+
+        # save key to reports directory
+        key_saveas = os.path.join(reports_filepath, 'dataset.keys')
+        with open(key_saveas, 'a') as f:
+            f.write(f'\n***\n\nmake_dataset.py started at {current_date_and_time}')
+            f.write(f'\nKey: {key}\n\n')
 
 
 if __name__ == '__main__':

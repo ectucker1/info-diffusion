@@ -28,7 +28,7 @@ endif
 
 ## Make Dataset
 data:
-	$(PYTHON_INTERPRETER) -m indiff.data.make_dataset data/raw data/processed
+	$(PYTHON_INTERPRETER) -m indiff.data.make_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
 
 ## Delete all compiled Python files
 clean:
@@ -40,6 +40,7 @@ lint:
 	flake8 indiff
 
 ## Delete given topic data
+## make clean_data TOPIC=small-network-5
 clean_data:
 	rm -rf data/raw/$(TOPIC)
 	rm -rf data/processed/$(TOPIC)
