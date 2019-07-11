@@ -61,6 +61,12 @@ activate the environment
 
 make data NETWORK_FILE={ csv-file } KEYWORDS_FILE={ keywords-text-file }
 
+
+To Delete a topic and its corresponding files
+----------------------
+
+make clean_data TOPIC={ topic-to-delete }
+
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
