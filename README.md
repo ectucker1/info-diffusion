@@ -52,6 +52,15 @@ Project Organization
     └── tox.ini            <- tox file with settings for running tox; see tox.testrun.org
 
 
+Running The Pipeline
+------------------
+
+make create_environment
+
+activate the environment
+
+make data NETWORK_FILE={ csv-file } KEYWORDS_FILE={ keywords-text-file }
+
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
