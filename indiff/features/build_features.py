@@ -179,7 +179,7 @@ def generate_default_attr(src_user, dest_user, keywords, graph):
     }
 
 
-def generate_additional_attr(user_id, n_days, keywords, graph, user='src'):
+def generate_additional_attr(user_id, keywords, graph, user='src', n_days=30):
     return {
         f'{user}_ratio_of_retweets_to_tweets':
         ratio_of_retweets_to_tweets(user_id, graph),
@@ -190,7 +190,7 @@ def generate_additional_attr(user_id, n_days, keywords, graph, user='src'):
         f'{user}_avg_number_of_retweets':
         avg_number_of_retweets(user_id, graph),
         f'{user}_avg_number_of_tweets':
-        avg_number_of_tweets(user_id, n_days, graph),
+        avg_number_of_tweets(user_id, graph),
         f'{user}_avg_number_of_mentions_not_including_retweets':
         avg_number_of_mentions_not_including_retweets(user_id, graph),
         f'{user}_ratio_of_mentions_to_tweet':
@@ -244,9 +244,9 @@ def generate_additional_attr(user_id, n_days, keywords, graph, user='src'):
     }
 
 
-def calculate_network_diffusion(edges, n_days, keywords, graph, *,
+def calculate_network_diffusion(edges, keywords, graph, *,
                                 additional_attr=False,
-                                do_not_add_sentiment=False):
+                                do_not_add_sentiment=False, n_days=30):
     # todo: turn this into a generator and see if its contents will only be
     # consumed once. this will require removing counter and search for another
     # way of knowing the number of things calculated
@@ -262,9 +262,9 @@ def calculate_network_diffusion(edges, n_days, keywords, graph, *,
 
         if additional_attr:
             src_result = generate_additional_attr(
-                src_user, n_days, keywords, graph)
+                src_user, keywords, graph)
             dest_result = generate_additional_attr(
-                dest_user, n_days, keywords, graph, user='dest')
+                dest_user, keywords, graph, user='dest')
 
             result = ChainMap(def_result, src_result, dest_result)
             yield (result)
@@ -330,9 +330,21 @@ def avg_number_of_retweets(user_id, graph):
     return n_retweeted_tweets / total_number_of_tweets
 
 
-def avg_number_of_tweets(user_id, n_days, graph):
+def get_user_number_of_tweet_days(user_id, graph):
+    tweet_max_date = graph._node[user_id]['tweet_max_date']
+    tweet_min_date = graph._node[user_id]['tweet_min_date']
+    diff = tweet_max_date - tweet_min_date
+
+    return diff.days
+
+
+def avg_number_of_tweets(user_id, graph, n_days=30):
     """ number 10 (new) """
     total_number_of_tweets = len(get_user_published_tweets(user_id, graph))
+    n_days = get_user_number_of_tweet_days(user_id, graph)
+
+    if total_number_of_tweets and n_days == 0:
+        n_days = 1
 
     avg = total_number_of_tweets / n_days
 

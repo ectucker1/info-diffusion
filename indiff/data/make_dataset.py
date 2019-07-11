@@ -12,123 +12,55 @@ from dotenv import find_dotenv, load_dotenv
 from sqlitedict import SqliteDict
 
 from indiff import utils
-from indiff.exception import ZeroTweetError
 from indiff.features import build_features
 from indiff.twitter import Tweet
+# from indiff.data import download_tweets
 
 
 @click.command()
-@click.option('--input', type=click.Path(exists=True))
-@click.option('--keywords', type=click.Path(exists=True))
-@click.option('--start', required=True, help='start date for tweet crawl')
-@click.option('--end', required=True, help='end date for tweet crawl')
-def main(input, keywords, start, end):
+@click.argument('input_filepath', type=click.Path(exists=True))
+@click.argument('keywords', type=click.Path(exists=True))
+def main(input_filepath, keywords):
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
 
     current_date_and_time = datetime.datetime.now()
 
-    if start.isdigit() and end.isdigit():
-        raise ValueError("Both start and end dates cannot be digits.")
-
-    if start.isdigit():
-        # start is therefore the number of days from end date
-        diff = datetime.timedelta(int(start))
-        end = utils.construct_datetime_from_str(end)
-        start = end - diff
-    elif end.isdigit():
-        diff = datetime.timedelta(int(end))
-        start = utils.construct_datetime_from_str(start)
-        end = start + diff
-    else:
-        start = utils.construct_datetime_from_str(start)
-        end = utils.construct_datetime_from_str(end)
-
-    # get input and create result destination dir from it
-    # input_path = Path(input)
-    input = Path(input)
-    if not input.is_absolute():
+    input_filepath = Path(input_filepath)
+    if not input_filepath.is_absolute():
         raise ValueError('Expected an absolute path.')
-    if not input.is_dir():
-        raise ValueError('input path is not a directory.')
+    if not input_filepath.is_dir():
+        raise ValueError('input_filepath path is not a directory.')
 
-    parts = list(input.parts)
-    parts[-6] = 'processed'
+    parts = list(input_filepath.parts)
+    parts[7] = 'processed'
     processed_path = Path(*parts)
     if not os.path.exists(processed_path):
         os.makedirs(processed_path)
 
-    graph_filepath = list(input.glob('*.adjlist'))[0]
-    database_filepath = list(input.glob('*.sqlite'))[0]
+    graph_filepath = list(input_filepath.glob('*.adjlist'))[0]
+    database_filepath = list(input_filepath.glob('*.sqlite'))[0]
 
     # infer path to write corresponding reports
     # change 'data' to 'reports'
     # reomve 'raw' from original path
-    parts = list(input.parts)
-    parts[-7] = 'reports'
-    parts.pop(-6)
+    parts = list(input_filepath.parts)
+    parts[6] = 'reports'
+    parts.pop(7)
     reports_filepath = Path(*parts)
-
-    stats_filepath = list(input.glob('*.txt'))[0]
-
-    # make sure the dates provided here are with the range of avaliable dataset
-    with open(stats_filepath) as f:
-        stats = f.readlines()
-        stats = [s.strip('\n') for s in stats]
-        stats = stats[-3:]
-
-    file_start_date = stats[0].split(' ')
-    file_start_date = utils.construct_datetime_from_str(file_start_date[-2])
-
-    file_end_date = stats[1].split(' ')
-    file_end_date = utils.construct_datetime_from_str(file_end_date[-2])
-
-    n_tweets = stats[2].split(' ')
-    n_tweets = int(n_tweets[-1])
-
-    if n_tweets == 0:
-        raise ZeroTweetError('There are zero tweets in the database.')
-
-    n_min_tweets = 2
-    if n_tweets < n_min_tweets:
-        raise ValueError(f'Found {n_tweets} tweets in database. '
-                         f'Get more data (>{n_min_tweets}).')
-
-    if not file_start_date <= start <= file_end_date:
-        raise ValueError(
-            f'Start date "{start.date()}" is out of range'
-            f'({str(file_start_date.date())}, '
-            f'{str((file_end_date + datetime.timedelta(1)).date())}).')
-
-    if not file_start_date <= end <= file_end_date:
-        raise ValueError(
-            f'End date "{end.date()}" is out of range'
-            f'({str(file_start_date.date())}, '
-            f'{str((file_end_date + datetime.timedelta(1)).date())}).')
 
     # get tweet ids that fulfil the date range of interest
     with SqliteDict(filename=database_filepath.as_posix(),
                     tablename='tweet-objects') as tweets:
-        sub_tweet_ids = {
-            tweet_id for tweet_id, tweet in tweets.items()
-            if start <= tweet.created_at <= end + datetime.timedelta(1)
-            }
 
         logging.info("Load graph from file")
-        sn = nx.read_adjlist(graph_filepath.as_posix(), delimiter=',',
-                             create_using=nx.DiGraph())
-
-        # shkrink graph by removing users who dont fulfil the date of interest
-        valid_ids = {tweets[tweet_id].user.id_str
-                     for tweet_id in sub_tweet_ids}
-        error_ids = sn.nodes() - valid_ids
-        error_len = len(error_ids)
-        logging.info(f"Removing {error_len} error ids from social network")
-        sn.remove_nodes_from(error_ids)
+        social_network = nx.read_adjlist(graph_filepath.as_posix(),
+                                         delimiter=',',
+                                         create_using=nx.DiGraph())
 
         # initialise node attributes to have desired info from dataset
-        for user_id in nx.nodes(sn):
+        for user_id in nx.nodes(social_network):
             attr = {user_id: {'tweets': dict(),
                               'tweets_with_hashtags': dict(),
                               'tweets_with_urls': dict(),
@@ -160,30 +92,31 @@ def main(input, keywords, start, end):
                               'followers_count': 0,
                               'friends_count': 0,
                               'followers_ids': [],
-                              'friends_ids': []}
+                              'friends_ids': [],
+                              'tweet_min_date': 0,
+                              'tweet_max_date': 0,
+                              }
                     }
 
-            nx.set_node_attributes(sn, attr)
+            nx.set_node_attributes(social_network, attr)
 
         keywords = utils.get_keywords_from_file(keywords)
 
         # iterate over the tweets dataset to fetch desired result for nodes
         bar = progressbar.ProgressBar(
-            maxval=len(sub_tweet_ids),
+            maxval=len(tweets),
             prefix='Computing Node Attributes ').start()
-        for i, (tweet_id) in enumerate(sub_tweet_ids):
-            status = tweets[tweet_id]
+        for i, (tweet_id, status) in enumerate(tweets.items()):
             tweet = Tweet(status._json)
             user_id = tweet.owner_id
 
-            user = sn._node[tweet.owner_id]
-
-            orig_owner_id = tweet.original_owner_id(tweets)
+            user = social_network._node[tweet.owner_id]
 
             user['followers_count'] = tweet.owner_followers_count
             user['friends_count'] = tweet.owner_friends_count
 
-            if orig_owner_id and orig_owner_id != user_id:
+            orig_owner_id = tweet.original_owner_id
+            if orig_owner_id != user_id:
                 user['all_possible_original_tweet_owners'].add(orig_owner_id)
 
             user_description = tweet.owner_description
@@ -247,10 +180,10 @@ def main(input, keywords, start, end):
 
             if users_mentioned_in_tweet:
                 for other_user in users_mentioned_in_tweet:
-                    if other_user in sn:
-                        sn._node[other_user]['users_who_mentioned_me'].update(
+                    if other_user in social_network:
+                        social_network._node[other_user]['users_who_mentioned_me'].update(
                             user_id)
-                        sn._node[other_user]['mentioned_in'].update(tweet_id)
+                        social_network._node[other_user]['mentioned_in'].update(tweet_id)
 
             user['retweet_count'] += tweet.retweet_count
 
@@ -259,10 +192,22 @@ def main(input, keywords, start, end):
 
             user['keywords_in_all_my_tweets'].update(tweet.keywords)
 
-            external_owner_id = tweet.original_owner_id(tweets)
-            if external_owner_id:
-                user['all_possible_original_tweet_owners'].add(
-                    external_owner_id)
+            if user['tweet_min_date'] == 0:
+                user['tweet_min_date'] = tweet.created_at
+
+            if user['tweet_max_date'] == 0:
+                user['tweet_max_date'] = tweet.created_at
+
+            if user['tweet_min_date'] > tweet.created_at:
+                user['tweet_min_date'] = tweet.created_at
+
+            if user['tweet_max_date'] < tweet.created_at:
+                user['tweet_max_date'] = tweet.created_at
+
+            # external_owner_id = tweet.original_owner_id
+            # if external_owner_id:
+            #     user['all_possible_original_tweet_owners'].add(
+            #         external_owner_id)
 
             # TODO: recalculate for neutral
             if tweet.is_positive_sentiment:
@@ -272,11 +217,9 @@ def main(input, keywords, start, end):
             bar.update(i)
         bar.finish()
 
-    n_days = (end - start).days
-
     # prepare table for dataframe
     results = build_features.calculate_network_diffusion(
-        nx.edges(sn), n_days, keywords, graph=sn,
+        nx.edges(social_network), keywords, graph=social_network,
         additional_attr=True, do_not_add_sentiment=False)
 
     df = pd.DataFrame(results)
@@ -293,19 +236,7 @@ def main(input, keywords, start, end):
     key_saveas = os.path.join(reports_filepath, 'dataset.keys')
     with open(key_saveas, 'a') as f:
         f.write(f'\n***\n\nmake_dataset.py started at {current_date_and_time}')
-        f.write(f'\nn_days: {n_days}')
-        f.write(f'\nStart Date: {str(start)}')
-        f.write(f'\nEnd Date: {str(end)}')
         f.write(f'\nKey: {key}\n\n')
-
-    graph_info_saveas = os.path.join(reports_filepath, 'network-stats.txt')
-    with open(graph_info_saveas, 'a') as f:
-        f.write(f'\n###\n\nmake_dataset.py started at {current_date_and_time}')
-        f.write(f'\nStart Date: {str(start)}')
-        f.write(f'\nEnd Date: {str(end)}')
-        f.write(f'\nn_days: {n_days}')
-        f.write(f'\nNumber of tweets: {len(sub_tweet_ids)}')
-        f.write(f'\n{nx.info(sn)}\n\n')
 
 
 if __name__ == '__main__':

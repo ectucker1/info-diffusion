@@ -32,15 +32,18 @@ def main(input_filepath):
     #    f'{current_date_and_time.hour}-{current_date_and_time.minute}'
 
     dataset_dir = os.path.join(datastore_root_dir, filename)
+
     database_file_path = os.path.join(dataset_dir, f'{filename}-tweets.sqlite')
 
     logger = logging.getLogger(__name__)
-    logger.info('downloading data set from raw data')
 
     url = "http://example.com/"
     timeout = 5
 
     try:
+        if os.path.exists(dataset_dir):
+            raise FileExistsError(f'Dataset for {filename} already exists.')
+
         # test internet conncetivity is active
         req = requests.get(url, timeout=timeout)
         req.raise_for_status()
@@ -60,7 +63,7 @@ def main(input_filepath):
         # build initial graph from file
         social_network = nx.read_edgelist(input_filepath, delimiter=',',
                                           create_using=nx.DiGraph())
-    except (ValueError, FileNotFoundError, KeyError) as error:
+    except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logging.error(error)
     except requests.HTTPError as e:
         logging.error(
@@ -76,6 +79,7 @@ def main(input_filepath):
         if not os.path.exists(dataset_dir):
             os.makedirs(dataset_dir)
 
+        logger.info('downloading data set from raw data')
         tweet_count, error_ids = get_all_tweets_in_network_and_build_tables(
             api, user_ids=nodes, database_file_path=database_file_path)
 
@@ -87,13 +91,22 @@ def main(input_filepath):
 
         social_network.name = filename
 
-        graph_info_saveas = os.path.join(dataset_dir,
+        dataset_filepath = Path(dataset_dir)
+        parts = list(dataset_filepath.parts)
+        parts[6] = 'reports'
+        parts.pop(7)
+        reports_filepath = Path(*parts)
+
+        if not os.path.exists(reports_filepath):
+            os.makedirs(reports_filepath)
+
+        graph_info_saveas = os.path.join(reports_filepath,
                                          f'{filename}-crawl-stats.txt')
         with open(graph_info_saveas, 'w') as f:
             f.write(f'###* Info for {filename}, started at '
                     f'{current_date_and_time}.\n#\n#\n')
+            f.write(nx.info(social_network))
             f.write(f'\nNumber of tweets: {tweet_count}')
-            f.write(f'\nNumber of users: {len(nodes)}')
 
         print('\n\n\n')
         logging.info(f'Use {dataset_dir} as an input_filepath to make_dataset.py')
