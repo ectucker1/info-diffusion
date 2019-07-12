@@ -19,31 +19,21 @@ from indiff.twitter import (API, Tweet,
 
 
 @click.command()
-@click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('keywords', type=click.Path(exists=True))
-def main(input_filepath, keywords):
+@click.argument('network_filepath', type=click.Path(exists=True))
+@click.argument('keywords_filepath', type=click.Path(exists=True))
+def main(network_filepath, keywords_filepath):
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
-
+    logger = logging.getLogger(__name__)
     current_date_and_time = datetime.datetime.now()
 
     # root directories
     root_dir = Path(__file__).resolve().parents[2]
     datastore_root_dir = os.path.join(root_dir, 'data', 'raw')
-    filename, _ = os.path.splitext(os.path.basename(input_filepath))
-
-    # make directories of year/month/day-of-crawl/time-of-crawl=hr-mins
-    # todo: correctly break the next line
-    # additional_filename = f'{current_date_and_time.year}/'\
-    #    f'{current_date_and_time.month}/{current_date_and_time.day}/'\
-    #    f'{current_date_and_time.hour}-{current_date_and_time.minute}'
-
+    filename, _ = os.path.splitext(os.path.basename(network_filepath))
     dataset_dir = os.path.join(datastore_root_dir, filename)
-
     database_file_path = os.path.join(dataset_dir, f'{filename}-tweets.sqlite')
-
-    logger = logging.getLogger(__name__)
 
     url = "http://example.com/"
     timeout = 5
@@ -62,40 +52,31 @@ def main(input_filepath, keywords):
         access_token = os.environ.get('ACCESS_TOKEN')
         access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET')
 
-        auth = API(consumer_key=consumer_key, consumer_secret=consumer_secret,
+        auth = API(consumer_key=consumer_key,
+                   consumer_secret=consumer_secret,
                    access_token=access_token,
                    access_token_secret=access_token_secret)
 
         api = auth()
 
         # build initial graph from file
-        social_network = nx.read_edgelist(input_filepath, delimiter=',',
+        social_network = nx.read_edgelist(network_filepath, delimiter=',',
                                           create_using=nx.DiGraph())
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logger.error(error)
     except requests.HTTPError as e:
-        logger.error(
-            "Checking internet connection failed, status code {0}".format(
-                e.response.status_code
-                )
-            )
+        logger.error("Checking internet connection failed, "
+                     f"status code {e.response.status_code}")
     except requests.ConnectionError:
         logger.error("No internet connection available.")
     else:
         nodes = social_network.nodes()
-
-        if not os.path.exists(dataset_dir):
-            os.makedirs(dataset_dir)
 
         logger.info('downloading data set from raw data')
         tweet_count, error_ids = get_all_tweets_in_network_and_build_tables(
             api, user_ids=nodes, database_file_path=database_file_path)
 
         social_network.remove_nodes_from(error_ids)
-
-        nx.write_adjlist(social_network,
-                         os.path.join(dataset_dir, f'{filename}.adjlist'),
-                         delimiter=',')
 
         social_network.name = filename
 
@@ -105,36 +86,30 @@ def main(input_filepath, keywords):
         parts.pop(7)
         reports_filepath = Path(*parts)
 
+        if not os.path.exists(dataset_dir):
+            os.makedirs(dataset_dir)
         if not os.path.exists(reports_filepath):
             os.makedirs(reports_filepath)
 
-        graph_info_saveas = os.path.join(reports_filepath,
-                                         f'{filename}-crawl-stats.txt')
-        with open(graph_info_saveas, 'w') as f:
-            f.write(f'###* Info for {filename}, started at '
-                    f'{current_date_and_time}.\n#\n#\n')
-            f.write(nx.info(social_network))
-            f.write(f'\nNumber of tweets: {tweet_count}')
-
         logger.info("Building Features")
-        input_filepath = Path(dataset_dir)
-        if not input_filepath.is_absolute():
+        network_filepath = Path(dataset_dir)
+        if not network_filepath.is_absolute():
             raise ValueError('Expected an absolute path.')
-        if not input_filepath.is_dir():
-            raise ValueError('input_filepath path is not a directory.')
+        if not network_filepath.is_dir():
+            raise ValueError('network_filepath path is not a directory.')
 
-        parts = list(input_filepath.parts)
+        parts = list(network_filepath.parts)
         parts[7] = 'processed'
         processed_path = Path(*parts)
         if not os.path.exists(processed_path):
             os.makedirs(processed_path)
 
-        database_filepath = list(input_filepath.glob('*.sqlite'))[0]
+        database_filepath = list(network_filepath.glob('*.sqlite'))[0]
 
         # infer path to write corresponding reports
         # change 'data' to 'reports'
         # reomve 'raw' from original path
-        parts = list(input_filepath.parts)
+        parts = list(network_filepath.parts)
         parts[6] = 'reports'
         parts.pop(7)
         reports_filepath = Path(*parts)
@@ -184,8 +159,6 @@ def main(input_filepath, keywords):
 
                 nx.set_node_attributes(social_network, attr)
 
-            keywords = utils.get_keywords_from_file(keywords)
-
             # iterate over the tweets dataset to fetch desired result for nodes
             bar = progressbar.ProgressBar(
                 maxval=len(tweets),
@@ -201,7 +174,8 @@ def main(input_filepath, keywords):
 
                 orig_owner_id = tweet.original_owner_id
                 if orig_owner_id != user_id:
-                    user['all_possible_original_tweet_owners'].add(orig_owner_id)
+                    user['all_possible_original_tweet_owners'].add(
+                        orig_owner_id)
 
                 user_description = tweet.owner_description
 
@@ -301,6 +275,8 @@ def main(input_filepath, keywords):
                 bar.update(i)
             bar.finish()
 
+        keywords = utils.get_keywords_from_file(keywords_filepath)
+
         # prepare table for dataframe
         results = build_features.calculate_network_diffusion(
             nx.edges(social_network), keywords, graph=social_network,
@@ -319,8 +295,21 @@ def main(input_filepath, keywords):
         # save key to reports directory
         key_saveas = os.path.join(reports_filepath, 'dataset.keys')
         with open(key_saveas, 'a') as f:
-            f.write(f'\n***\n\nmake_dataset.py started at {current_date_and_time}')
+            f.write('\n***\n\nmake_dataset.py '
+                    f'started at {current_date_and_time}')
             f.write(f'\nKey: {key}\n\n')
+
+        nx.write_adjlist(social_network,
+                         os.path.join(dataset_dir, f'{filename}.adjlist'),
+                         delimiter=',')
+
+        graph_info_saveas = os.path.join(reports_filepath,
+                                         f'{filename}-crawl-stats.txt')
+        with open(graph_info_saveas, 'w') as f:
+            f.write(f'###* Info for {filename}, started at '
+                    f'{current_date_and_time}.\n#\n#\n')
+            f.write(nx.info(social_network))
+            f.write(f'\nNumber of tweets: {tweet_count}')
 
 
 if __name__ == '__main__':
