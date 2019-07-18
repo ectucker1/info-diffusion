@@ -70,6 +70,10 @@ def main(network_filepath, keywords_filepath):
     except requests.ConnectionError:
         logger.error("No internet connection available.")
     else:
+
+        if not os.path.exists(dataset_dir):
+            os.makedirs(dataset_dir)
+
         nodes = social_network.nodes()
 
         logger.info('downloading data set from raw data')
@@ -85,9 +89,6 @@ def main(network_filepath, keywords_filepath):
         parts[6] = 'reports'
         parts.pop(7)
         reports_filepath = Path(*parts)
-
-        if not os.path.exists(dataset_dir):
-            os.makedirs(dataset_dir)
         if not os.path.exists(reports_filepath):
             os.makedirs(reports_filepath)
 
@@ -288,9 +289,6 @@ def main(network_filepath, keywords_filepath):
         key = utils.generate_random_id(length=15)
         processed_saveas = os.path.join(processed_path, 'dataset.h5')
         df.to_hdf(processed_saveas, key=key)
-
-        if not os.path.exists(reports_filepath):
-            os.makedirs(reports_filepath)
 
         # save key to reports directory
         key_saveas = os.path.join(reports_filepath, 'dataset.keys')

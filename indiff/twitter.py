@@ -489,6 +489,8 @@ def get_max_user_tweets_and_build_tables(api, user_id, database_file_path,
 
     # there is still need for test for users who have not tweeted within the
     # specified number of days
+    counter = 0
+
     with SqliteDict(database_file_path, tablename=tablename) as tweets_table:
         for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
                                                           id=user_id).items(
