@@ -30,6 +30,10 @@ endif
 data:
 	$(PYTHON_INTERPRETER) -m indiff.data.make_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
 
+## Restart at Building Features
+rebuild_features:
+	$(PYTHON_INTERPRETER) -m indiff.data.rebuild_features $(TOPIC) $(KEYWORDS_FILE)
+
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
