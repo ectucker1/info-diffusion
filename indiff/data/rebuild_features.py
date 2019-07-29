@@ -81,51 +81,51 @@ def main(topic, keywords_filepath):
         parts[6] = 'reports'
         parts.pop(7)
         reports_filepath = Path(*parts)
+        
+        # initialise node attributes to have desired info from dataset
+        for user_id in nx.nodes(social_network):
+            attr = {user_id: {'tweets': dict(),
+                              'tweets_with_hashtags': dict(),
+                              'tweets_with_urls': dict(),
+                              'tweets_with_media': dict(),
+                              'users_who_mentioned_me': set(),
+                              'tweets_with_others_mentioned_count': 0,
+                              'mentioned_in': set(),
+                              'users_mentioned_in_all_my_tweets': set(),
+                              'keywords_in_all_my_tweets': set(),
+                              'all_possible_original_tweet_owners': set(),
+                              'retweeted_tweets': dict(),
+                              'retweeted_tweets_with_hashtags': dict(),
+                              'retweeted_tweets_with_urls': dict(),
+                              'retweeted_tweets_with_media': dict(),
+                              'users_mentioned_in_all_my_retweets': set(),
+                              'retweets_with_others_mentioned_count': 0,
+                              'retweet_count': 0,
+                              'retweeted_count': 0,
+                              'quoted_tweets': dict(),
+                              'quoted_tweets_with_hashtags': dict(),
+                              'quoted_tweets_with_urls': dict(),
+                              'quoted_tweets_with_media': dict(),
+                              'users_mentioned_in_all_my_quoted_tweets': set(),
+                              'quoted_tweets_with_others_mentioned_count': 0,
+                              'description': None,
+                              'favorite_tweets_count': 0,
+                              'positive_sentiment_count': 0,
+                              'negative_sentiment_count': 0,
+                              'followers_count': 0,
+                              'friends_count': 0,
+                              'followers_ids': [],
+                              'friends_ids': [],
+                              'tweet_min_date': 0,
+                              'tweet_max_date': 0,
+                              }
+                    }
+
+            nx.set_node_attributes(social_network, attr)
 
         # get tweet ids that fulfil the date range of interest
         with SqliteDict(filename=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
-
-            # initialise node attributes to have desired info from dataset
-            for user_id in nx.nodes(social_network):
-                attr = {user_id: {'tweets': dict(),
-                                  'tweets_with_hashtags': dict(),
-                                  'tweets_with_urls': dict(),
-                                  'tweets_with_media': dict(),
-                                  'users_who_mentioned_me': set(),
-                                  'tweets_with_others_mentioned_count': 0,
-                                  'mentioned_in': set(),
-                                  'users_mentioned_in_all_my_tweets': set(),
-                                  'keywords_in_all_my_tweets': set(),
-                                  'all_possible_original_tweet_owners': set(),
-                                  'retweeted_tweets': dict(),
-                                  'retweeted_tweets_with_hashtags': dict(),
-                                  'retweeted_tweets_with_urls': dict(),
-                                  'retweeted_tweets_with_media': dict(),
-                                  'users_mentioned_in_all_my_retweets': set(),
-                                  'retweets_with_others_mentioned_count': 0,
-                                  'retweet_count': 0,
-                                  'retweeted_count': 0,
-                                  'quoted_tweets': dict(),
-                                  'quoted_tweets_with_hashtags': dict(),
-                                  'quoted_tweets_with_urls': dict(),
-                                  'quoted_tweets_with_media': dict(),
-                                  'users_mentioned_in_all_my_quoted_tweets': set(),
-                                  'quoted_tweets_with_others_mentioned_count': 0,
-                                  'description': None,
-                                  'favorite_tweets_count': 0,
-                                  'positive_sentiment_count': 0,
-                                  'negative_sentiment_count': 0,
-                                  'followers_count': 0,
-                                  'friends_count': 0,
-                                  'followers_ids': [],
-                                  'friends_ids': [],
-                                  'tweet_min_date': 0,
-                                  'tweet_max_date': 0,
-                                  }
-                        }
-
-                nx.set_node_attributes(social_network, attr)
 
             # iterate over the tweets dataset to fetch desired result for nodes
             bar = progressbar.ProgressBar(
