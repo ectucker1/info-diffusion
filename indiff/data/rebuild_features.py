@@ -35,8 +35,7 @@ def main(topic, keywords_filepath):
 
     try:
         if not os.path.exists(dataset_dir):
-            raise FileExistsError(f'Dataset for {filename} does not already '
-                                  'exists.')
+            raise FileExistsError(f'Dataset for {filename} does not exists.')
 
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logger.error(error)
