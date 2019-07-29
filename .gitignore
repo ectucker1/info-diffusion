@@ -89,5 +89,9 @@ target/
 # Mypy cache
 .mypy_cache/
 
-# remove lock file
+# remove lock files
 *.lock
+
+# ignore html files
+*.html
+*.css
