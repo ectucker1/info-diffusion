@@ -3,11 +3,18 @@
 ## Table of Contents
 
 - [About](#about)
+- [Getting Started](#getting_started)
 - [Usage](#usage)
 
 ## About <a name = "about"></a>
 
 Predict the temporal dynamics of information diffusion on Twitter
+
+## Getting Started <a name = "getting_started"></a>
+
+### Prerequisites
+
+- anaconda
 
 ## Usage
 
@@ -39,6 +46,14 @@ To rebuild features for topic - twitter-trends:
 
 ```bash
 make rebuild_features TOPIC=twitter-trends KEYWORDS_FILE=root/dir-1/dir-2/keywords.txt
+```
+
+### Update Python Dependencies
+
+After update(s) to the requirement.yml:
+
+```bash
+make requirements
 ```
 
 ## Project Organization
