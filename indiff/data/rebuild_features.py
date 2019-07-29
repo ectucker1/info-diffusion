@@ -81,7 +81,7 @@ def main(topic, keywords_filepath):
         parts[6] = 'reports'
         parts.pop(7)
         reports_filepath = Path(*parts)
-        
+
         # initialise node attributes to have desired info from dataset
         for user_id in nx.nodes(social_network):
             attr = {user_id: {'tweets': dict(),
