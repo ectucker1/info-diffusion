@@ -8,9 +8,11 @@ import pickle
 import random
 import re
 import string
+import time
 from itertools import count
 
 import pandas as pd
+import psutil
 from nltk.corpus import stopwords
 from nltk.tokenize import TweetTokenizer
 from sqlitedict import SqliteDict
@@ -160,3 +162,27 @@ def construct_datetime_from_str(s):
         s = s.split('/')
 
     return datetime.datetime(int(s[0]), int(s[1]), int(s[2]))
+
+
+def elapsed_since(start):
+    return time.strftime("%H:%M:%S", time.gmtime(time.time() - start))
+
+
+def get_process_memory():
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss
+
+
+def track(func):
+    def wrapper(*args, **kwargs):
+        mem_before = get_process_memory()
+        start = time.time()
+        result = func(*args, **kwargs)
+        elapsed_time = elapsed_since(start)
+        mem_after = get_process_memory()
+        print("{}: memory before: {:,}, after: {:,}, consumed: {:,}; exec time: {}".format(
+            func.__name__,
+            mem_before, mem_after, mem_after - mem_before,
+            elapsed_time))
+        return result
+    return wrapper
