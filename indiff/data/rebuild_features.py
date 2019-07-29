@@ -15,8 +15,10 @@ from sqlitedict import SqliteDict
 from indiff import utils
 from indiff.features import build_features
 from indiff.twitter import Tweet
+from utils import track
 
 
+@track
 @click.command()
 @click.argument('topic')
 @click.argument('keywords_filepath', type=click.Path(exists=True))
