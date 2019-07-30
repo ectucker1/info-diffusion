@@ -49,3 +49,4 @@ dependencies:
   - theano
   - tweepy
   - yellowbrick
+  - memory_profiler
