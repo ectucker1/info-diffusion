@@ -266,7 +266,7 @@ def main(topic, keywords_filepath):
             print(f'Removed {key_saveas} for a new one.')
 
         with open(key_saveas, 'w') as f:
-            f.write('\n***\n\nmake_dataset.py '
+            f.write('\n***\n\nrebuild_features.py '
                     f'started at {current_date_and_time}')
             f.write(f'\nKey: {key}\n\n')
 
