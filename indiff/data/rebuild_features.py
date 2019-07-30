@@ -15,10 +15,8 @@ from sqlitedict import SqliteDict
 from indiff import utils
 from indiff.features import build_features
 from indiff.twitter import Tweet
-from utils import track
 
 
-@track
 @click.command()
 @click.argument('topic')
 @click.argument('keywords_filepath', type=click.Path(exists=True))
@@ -128,12 +126,10 @@ def main(topic, keywords_filepath):
         # get tweet ids that fulfil the date range of interest
         with SqliteDict(filename=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
-
             # iterate over the tweets dataset to fetch desired result for nodes
-            bar = progressbar.ProgressBar(
-                maxval=len(tweets),
-                prefix='Computing Node Attributes ').start()
-            for i, (tweet_id, status) in enumerate(tweets.items()):
+            bar = progressbar.ProgressBar(maxval=len(tweets)).start()
+            for i, tweet_id in enumerate(tweets):
+                status = tweets[tweet_id]
                 tweet = Tweet(status._json)
                 user_id = tweet.owner_id
 
