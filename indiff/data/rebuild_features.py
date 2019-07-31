@@ -133,7 +133,7 @@ def main(topic, keywords_filepath):
                 tweet = Tweet(status._json)
                 user_id = tweet.owner_id
 
-                user = social_network._node[tweet.owner_id]
+                user = social_network._node[user_id]
 
                 user['followers_count'] = tweet.owner_followers_count
                 user['friends_count'] = tweet.owner_friends_count
