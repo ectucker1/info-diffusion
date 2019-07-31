@@ -3,14 +3,14 @@
 ## Table of Contents
 
 - [About](#about)
-- [Getting Started](#getting_started)
+- [Getting Started](#getting-started)
 - [Usage](#usage)
 
-## About <a name = "about"></a>
+## About
 
 Predict the temporal dynamics of information diffusion on Twitter
 
-## Getting Started <a name = "getting_started"></a>
+## Getting Started
 
 ### Prerequisites
 
