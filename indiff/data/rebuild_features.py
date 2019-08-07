@@ -133,6 +133,8 @@ def main(topic, keywords_filepath):
                 tweet = Tweet(status._json)
                 user_id = tweet.owner_id
 
+                if user_id not in social_network:
+                    continue
                 user = social_network._node[user_id]
 
                 user['followers_count'] = tweet.owner_followers_count
