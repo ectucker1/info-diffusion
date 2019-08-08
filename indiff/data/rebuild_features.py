@@ -27,6 +27,11 @@ def main(topic, keywords_filepath):
     logger = logging.getLogger(__name__)
     current_date_and_time = datetime.datetime.now()
 
+    try:
+        pass
+    finally:
+        pass
+
     # root directories
     root_dir = Path(__file__).resolve().parents[2]
     datastore_root_dir = os.path.join(root_dir, 'data', 'raw')
@@ -127,8 +132,8 @@ def main(topic, keywords_filepath):
         with SqliteDict(filename=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
             # iterate over the tweets dataset to fetch desired result for nodes
-            bar = progressbar.ProgressBar(maxval=len(tweets)).start()
-            for i, tweet_id in enumerate(tweets):
+            bar = progressbar.ProgressBar(maxval=len(tweets))
+            for tweet_id in bar(tweets):
                 status = tweets[tweet_id]
                 tweet = Tweet(status._json)
                 user_id = tweet.owner_id
@@ -240,8 +245,6 @@ def main(topic, keywords_filepath):
                     user['positive_sentiment_count'] += 1
                 else:
                     user['negative_sentiment_count'] += 1
-                bar.update(i)
-            bar.finish()
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
 

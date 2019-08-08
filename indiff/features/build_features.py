@@ -257,14 +257,13 @@ def calculate_network_diffusion(edges, keywords, graph, *,
                ' edges (', progressbar.Timer(), ')']
     bar = progressbar.ProgressBar(widgets=widgets)
     for src_user, dest_user in bar(edges):
-        def_result = generate_default_attr(
-            src_user, dest_user, keywords, graph)
+        def_result = generate_default_attr(src_user, dest_user, keywords,
+                                           graph)
 
         if additional_attr:
-            src_result = generate_additional_attr(
-                src_user, keywords, graph)
-            dest_result = generate_additional_attr(
-                dest_user, keywords, graph, user='dest')
+            src_result = generate_additional_attr(src_user, keywords, graph)
+            dest_result = generate_additional_attr(dest_user, keywords, graph,
+                                                   user='dest')
 
             result = ChainMap(def_result, src_result, dest_result)
             yield (result)
