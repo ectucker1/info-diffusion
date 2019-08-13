@@ -128,7 +128,7 @@ def main(topic, keywords_filepath):
                         tablename='tweet-objects') as tweets:
             # iterate over the tweets dataset to fetch desired result for nodes
             bar = progressbar.ProgressBar(maxval=len(tweets)).start()
-            for i, tweet_id in enumerate(tweets):
+            for tweet_id in bar(tweets):
                 status = tweets[tweet_id]
                 tweet = Tweet(status._json)
                 user_id = tweet.owner_id
@@ -205,8 +205,7 @@ def main(topic, keywords_filepath):
                 if users_mentioned_in_tweet:
                     for other_user in users_mentioned_in_tweet:
                         if other_user in social_network:
-                            social_network._node[other_user]['users_who_mentioned_me'].update(
-                                user_id)
+                            social_network._node[other_user]['users_who_mentioned_me'].update(user_id)
                             social_network._node[other_user]['mentioned_in'].update(tweet_id)
 
                 user['retweet_count'] += tweet.retweet_count
@@ -238,8 +237,6 @@ def main(topic, keywords_filepath):
                     user['positive_sentiment_count'] += 1
                 else:
                     user['negative_sentiment_count'] += 1
-                bar.update(i)
-            bar.finish()
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
