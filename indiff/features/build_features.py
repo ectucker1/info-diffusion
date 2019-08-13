@@ -257,6 +257,15 @@ def calculate_network_diffusion(edges, keywords, graph, *,
                ' edges (', progressbar.Timer(), ')']
     bar = progressbar.ProgressBar(widgets=widgets)
     for src_user, dest_user in bar(edges):
+
+        # to make sure that edges not calculated are skipped
+
+        src_n_tweets = get_user_published_tweets(src_user, graph)
+        dest_n_tweets = get_user_published_tweets(dest_user, graph)
+
+        if not src_n_tweets or not dest_n_tweets:
+            continue
+
         def_result = generate_default_attr(src_user, dest_user, keywords,
                                            graph)
 

@@ -128,12 +128,15 @@ def main(topic, keywords_filepath):
 
             nx.set_node_attributes(social_network, attr)
 
+        tweet_counter = 0
         # get tweet ids that fulfil the date range of interest
         with SqliteDict(filename=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
             # iterate over the tweets dataset to fetch desired result for nodes
             bar = progressbar.ProgressBar(maxval=len(tweets))
             for tweet_id in bar(tweets):
+                if tweet_counter == 500000:
+                    break
                 status = tweets[tweet_id]
                 tweet = Tweet(status._json)
                 user_id = tweet.owner_id
@@ -245,6 +248,8 @@ def main(topic, keywords_filepath):
                     user['positive_sentiment_count'] += 1
                 else:
                     user['negative_sentiment_count'] += 1
+
+                tweet_counter += 1
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
