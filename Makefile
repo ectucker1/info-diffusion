@@ -27,11 +27,11 @@ ifneq (conda, $(VIRTUALENV))
 endif
 
 ## Make Dataset
-data: test_environment
+data: test_environment test_server
 	$(PYTHON_INTERPRETER) -m indiff.data.make_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
 
 ## Restart at Building Features
-rebuild_features: test_environment
+rebuild_features: test_environment test_server
 	$(PYTHON_INTERPRETER) -m indiff.data.rebuild_features $(TOPIC) $(KEYWORDS_FILE)
 
 ## Delete all compiled Python files
@@ -114,6 +114,17 @@ ifeq (conda,$(VIRTUALENV))
 	$(CONDA_EXE) env remove -n $(PROJECT_NAME)
 endif
 
+## Start server
+start_server:
+	sudo service mongod start
+
+## Stop server
+stop_server:
+	sudo service mongod stop
+
+## Restart server
+restart_server:
+	sudo service mongod restart
 
 ## Test python environment is set-up correctly
 test_environment:
@@ -124,6 +135,10 @@ endif
 endif
 	$(PYTHON_INTERPRETER) test_environment.py
 
+
+## Test that MongoDB is set-up correctly
+test_server:
+	$(PYTHON_INTERPRETER) test_server.py
 
 #################################################################################
 # PROJECT RULES                                                                 #
