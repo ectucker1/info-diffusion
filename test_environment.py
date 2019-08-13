@@ -30,6 +30,6 @@ if __name__ == '__main__':
         client.admin.command('ismaster')
     except ConnectionFailure:
         print("--- Server not available. Please install or start MongoDB "
-              "instance")
+              "instance.")
     except (ValueError, TypeError) as err:
         print(f'{err}')
