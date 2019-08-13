@@ -50,3 +50,4 @@ dependencies:
   - tweepy
   - yellowbrick
   - memory_profiler
+  - pymongo
