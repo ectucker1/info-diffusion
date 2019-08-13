@@ -1,4 +1,6 @@
 import sys
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 
 REQUIRED_PYTHON = "python3"
 
@@ -22,4 +24,13 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    
+    client = MongoClient()
+
+    try:
+        main()
+        client.admin.command('ismaster')
+    except ConnectionFailure:
+        print("Server not available. Please install or start MongoDB instance")
+    except (ValueError, TypeError) as err:
+        print(f'{err}')
