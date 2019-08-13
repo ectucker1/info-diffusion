@@ -27,11 +27,11 @@ ifneq (conda, $(VIRTUALENV))
 endif
 
 ## Make Dataset
-data:
+data: test_environment
 	$(PYTHON_INTERPRETER) -m indiff.data.make_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
 
 ## Restart at Building Features
-rebuild_features:
+rebuild_features: test_environment
 	$(PYTHON_INTERPRETER) -m indiff.data.rebuild_features $(TOPIC) $(KEYWORDS_FILE)
 
 ## Delete all compiled Python files

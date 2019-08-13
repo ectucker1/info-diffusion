@@ -31,5 +31,6 @@ if __name__ == '__main__':
     except ConnectionFailure:
         print("--- Server not available. Please install or start MongoDB "
               "instance.")
+        sys.exit(1)
     except (ValueError, TypeError) as err:
         print(f'{err}')
