@@ -46,7 +46,7 @@ dependencies:
   - sqlite
   - sqlitedict
   - textblob
-  - theano
+  - theano==1.0.4
   - tweepy
   - yellowbrick
   - memory_profiler
