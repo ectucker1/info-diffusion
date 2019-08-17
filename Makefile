@@ -34,6 +34,10 @@ data: test_environment test_server
 rebuild_features: test_environment test_server
 	$(PYTHON_INTERPRETER) -m indiff.data.rebuild_features $(TOPIC) $(KEYWORDS_FILE)
 
+## Export database from sqlitedict to mongodb
+export_db: test_environment test_server
+	$(PYTHON_INTERPRETER) -m indiff.data.export_db $(TOPIC)
+
 ## Delete all compiled Python files
 clean:
 	find . -type f -name "*.py[co]" -delete
