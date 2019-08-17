@@ -422,39 +422,6 @@ class Tweet(object):
         return self.tweet['user']['friends_count']
 
 
-def get_user_tweets_and_build_tables(api, user_id, days, database_file_path,
-                                     tablename='tweet-objects'):
-
-    """Fetch all tweets by a user....(((( we may need to include keywords to
-    fetch only tweets with related keywords"""
-
-    today = datetime.datetime.today()
-    print(">>  Processing {}'s tweets....".format(user_id))
-
-    # there is still need for test for users who have not tweeted within the
-    # specified number of days
-    with SqliteDict(database_file_path, tablename=tablename) as tweets_table:
-        for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
-                                                          id=user_id).items()):
-            # process status here
-            if counter % 100 == 0 and counter != 0:
-                print(f'>>  Over {counter} tweets have been retrieved so far'
-                      f'..USER ID: {user_id}')
-
-            difference = (today - status.created_at).days
-
-            if difference >= days + 1:
-                break
-            else:
-                tweet_id = status.id_str
-                # if this doesn't wort, try its private json extension
-                tweets_table[tweet_id] = status
-                tweets_table.commit()
-
-    logging.info(f'Total number of tweets retrieved from {user_id}: {counter}')
-    return counter
-
-
 def get_user_tweets_in_network(api=None, users=None, collection=None,
                                n_tweets=5000):
     total = len(users)

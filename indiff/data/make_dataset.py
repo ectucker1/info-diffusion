@@ -11,12 +11,10 @@ import progressbar
 import pymongo
 import requests
 from dotenv import find_dotenv, load_dotenv
-from sqlitedict import SqliteDict
 
 from indiff import utils
 from indiff.features import build_features
-from indiff.twitter import (API, Tweet,
-                            get_all_tweets_in_network_and_build_tables)
+from indiff.twitter import (API, Tweet, get_user_tweets_in_network)
 
 
 @click.command()
@@ -34,27 +32,15 @@ def main(network_filepath, keywords_filepath):
     datastore_root_dir = os.path.join(root_dir, 'data', 'raw')
     filename, _ = os.path.splitext(os.path.basename(network_filepath))
     dataset_dir = os.path.join(datastore_root_dir, filename)
-    database_file_path = os.path.join(dataset_dir, f'{filename}-tweets.sqlite')
 
     url = "http://example.com/"
     timeout = 5
-    
-    db_name = "infodiffusion"
-    collection_name = topic
+
+    db_name = "info_diffusion"
 
     try:
         if os.path.exists(dataset_dir):
             raise FileExistsError(f'Dataset for {filename} already exists.')
-        
-        myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-        mydb = myclient[db_name]
-
-        if db_name not in myclient.list_database_names():
-            raise ValueError(f"Database does not exist: {db_name}.")
-
-        mycol = mydb[collection_name]
-        if collection_name not in mydb.list_collection_names():
-            raise ValueError(f"Collection does not exist: {collection_name}.")
 
         # test internet conncetivity is active
         req = requests.get(url, timeout=timeout)
@@ -72,6 +58,10 @@ def main(network_filepath, keywords_filepath):
                    access_token_secret=access_token_secret)
 
         api = auth()
+
+        myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = myclient[db_name]
+        col = db[filename]
 
         # build initial graph from file
         social_network = nx.read_edgelist(network_filepath, delimiter=',',
@@ -91,10 +81,15 @@ def main(network_filepath, keywords_filepath):
         nodes = social_network.nodes()
 
         logger.info('downloading data set from raw data')
-        tweet_count, error_ids = get_all_tweets_in_network_and_build_tables(
-            api, user_ids=nodes, database_file_path=database_file_path)
+        tweet_count, error_ids = get_user_tweets_in_network(api=api,
+                                                            users=nodes,
+                                                            collection=col)
 
+        logger.info('removing ids with error from graph')
         social_network.remove_nodes_from(error_ids)
+
+        # free memory holding error ids
+        del error_ids
 
         social_network.name = filename
 
@@ -119,8 +114,6 @@ def main(network_filepath, keywords_filepath):
         if not os.path.exists(processed_path):
             os.makedirs(processed_path)
 
-        database_filepath = list(network_filepath.glob('*.sqlite'))[0]
-
         # infer path to write corresponding reports
         # change 'data' to 'reports'
         # reomve 'raw' from original path
@@ -132,47 +125,47 @@ def main(network_filepath, keywords_filepath):
         # initialise node attributes to have desired info from dataset
         for user_id in nx.nodes(social_network):
             attr = {user_id: {'tweets': dict(),
-                                'tweets_with_hashtags': dict(),
-                                'tweets_with_urls': dict(),
-                                'tweets_with_media': dict(),
-                                'users_who_mentioned_me': set(),
-                                'tweets_with_others_mentioned_count': 0,
-                                'mentioned_in': set(),
-                                'users_mentioned_in_all_my_tweets': set(),
-                                'keywords_in_all_my_tweets': set(),
-                                'all_possible_original_tweet_owners': set(),
-                                'retweeted_tweets': dict(),
-                                'retweeted_tweets_with_hashtags': dict(),
-                                'retweeted_tweets_with_urls': dict(),
-                                'retweeted_tweets_with_media': dict(),
-                                'users_mentioned_in_all_my_retweets': set(),
-                                'retweets_with_others_mentioned_count': 0,
-                                'retweet_count': 0,
-                                'retweeted_count': 0,
-                                'quoted_tweets': dict(),
-                                'quoted_tweets_with_hashtags': dict(),
-                                'quoted_tweets_with_urls': dict(),
-                                'quoted_tweets_with_media': dict(),
-                                'users_mentioned_in_all_my_quoted_tweets': set(),
-                                'quoted_tweets_with_others_mentioned_count': 0,
-                                'description': None,
-                                'favorite_tweets_count': 0,
-                                'positive_sentiment_count': 0,
-                                'negative_sentiment_count': 0,
-                                'followers_count': 0,
-                                'friends_count': 0,
-                                'followers_ids': [],
-                                'friends_ids': [],
-                                'tweet_min_date': 0,
-                                'tweet_max_date': 0,
-                                }
+                              'tweets_with_hashtags': dict(),
+                              'tweets_with_urls': dict(),
+                              'tweets_with_media': dict(),
+                              'users_who_mentioned_me': set(),
+                              'tweets_with_others_mentioned_count': 0,
+                              'mentioned_in': set(),
+                              'users_mentioned_in_all_my_tweets': set(),
+                              'keywords_in_all_my_tweets': set(),
+                              'all_possible_original_tweet_owners': set(),
+                              'retweeted_tweets': dict(),
+                              'retweeted_tweets_with_hashtags': dict(),
+                              'retweeted_tweets_with_urls': dict(),
+                              'retweeted_tweets_with_media': dict(),
+                              'users_mentioned_in_all_my_retweets': set(),
+                              'retweets_with_others_mentioned_count': 0,
+                              'retweet_count': 0,
+                              'retweeted_count': 0,
+                              'quoted_tweets': dict(),
+                              'quoted_tweets_with_hashtags': dict(),
+                              'quoted_tweets_with_urls': dict(),
+                              'quoted_tweets_with_media': dict(),
+                              'users_mentioned_in_all_my_quoted_tweets': set(),
+                              'quoted_tweets_with_others_mentioned_count': 0,
+                              'description': None,
+                              'favorite_tweets_count': 0,
+                              'positive_sentiment_count': 0,
+                              'negative_sentiment_count': 0,
+                              'followers_count': 0,
+                              'friends_count': 0,
+                              'followers_ids': [],
+                              'friends_ids': [],
+                              'tweet_min_date': 0,
+                              'tweet_max_date': 0,
+                              }
                     }
 
             nx.set_node_attributes(social_network, attr)
 
         # iterate over the tweets dataset to fetch desired result for nodes
         bar = progressbar.ProgressBar(prefix='Computing Node Attributes: ')
-        for tweet in bar(mycol.find()):
+        for tweet in bar(col.find()):
             tweet = Tweet(tweet)
             user_id = tweet.owner_id
 
@@ -192,14 +185,14 @@ def main(network_filepath, keywords_filepath):
                 user['description'] = user_description
 
             if tweet.is_retweeted_tweet:
-                user['retweeted_tweets'][tweet_id] = tweet
+                user['retweeted_tweets'][tweet.id] = tweet
 
                 if tweet.hashtags:
-                    user['retweeted_tweets_with_hashtags'][tweet_id] = tweet
+                    user['retweeted_tweets_with_hashtags'][tweet.id] = tweet
                 if tweet.urls:
-                    user['retweeted_tweets_with_urls'][tweet_id] = tweet
+                    user['retweeted_tweets_with_urls'][tweet.id] = tweet
                 if tweet.media:
-                    user['retweeted_tweets_with_media'][tweet_id] = tweet
+                    user['retweeted_tweets_with_media'][tweet.id] = tweet
 
                 users_mentioned_in_tweet = tweet.users_mentioned
                 user['users_mentioned_in_all_my_retweets'].update(
@@ -209,14 +202,14 @@ def main(network_filepath, keywords_filepath):
                     user['retweets_with_others_mentioned_count'] += 1
 
             elif tweet.is_quoted_tweet:
-                user['quoted_tweets'][tweet_id] = tweet
+                user['quoted_tweets'][tweet.id] = tweet
 
                 if tweet.hashtags:
-                    user['quoted_tweets_with_hashtags'][tweet_id] = tweet
+                    user['quoted_tweets_with_hashtags'][tweet.id] = tweet
                 if tweet.urls:
-                    user['quoted_tweets_with_urls'][tweet_id] = tweet
+                    user['quoted_tweets_with_urls'][tweet.id] = tweet
                 if tweet.media:
-                    user['quoted_tweets_with_media'][tweet_id] = tweet
+                    user['quoted_tweets_with_media'][tweet.id] = tweet
 
                 users_mentioned_in_tweet = tweet.users_mentioned
                 user['users_mentioned_in_all_my_quoted_tweets'].update(
@@ -226,14 +219,14 @@ def main(network_filepath, keywords_filepath):
                     user['quoted_tweets_with_others_mentioned_count'] += 1
 
             else:
-                user['tweets'][tweet_id] = tweet
+                user['tweets'][tweet.id] = tweet
 
                 if tweet.hashtags:
-                    user['tweets_with_hashtags'][tweet_id] = tweet
+                    user['tweets_with_hashtags'][tweet.id] = tweet
                 if tweet.urls:
-                    user['tweets_with_urls'][tweet_id] = tweet
+                    user['tweets_with_urls'][tweet.id] = tweet
                 if tweet.media:
-                    user['tweets_with_media'][tweet_id] = tweet
+                    user['tweets_with_media'][tweet.id] = tweet
 
                 users_mentioned_in_tweet = tweet.users_mentioned
                 user['users_mentioned_in_all_my_tweets'].update(
@@ -250,7 +243,7 @@ def main(network_filepath, keywords_filepath):
                     if other_user in social_network:
                         social_network._node[other_user]['users_who_mentioned_me'].update(
                             user_id)
-                        social_network._node[other_user]['mentioned_in'].update(tweet_id)
+                        social_network._node[other_user]['mentioned_in'].update(tweet.id)
 
             user['retweet_count'] += tweet.retweet_count
 
