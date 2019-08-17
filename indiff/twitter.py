@@ -5,15 +5,13 @@ from itertools import count
 from time import sleep
 
 import tweepy
+from pymongo.errors import DuplicateKeyError
 from selenium import webdriver
 from selenium.common.exceptions import (NoSuchElementException,
                                         StaleElementReferenceException)
-from sqlitedict import SqliteDict
 
 from .exception import WebBrowserError, WebDriverError
 from .utils import sentiment, split_text
-
-from pymongo.errors import DuplicateKeyError
 
 
 def _format_date(date):
@@ -424,6 +422,23 @@ class Tweet(object):
 
 def get_user_tweets_in_network(api=None, users=None, collection=None,
                                n_tweets=5000):
+    """Fetches users' tweets into database.
+
+    Keyword Arguments:
+        api {Tweepy} -- wrapper for the API as provided by Twitter
+        (default: {None})
+        users {iterable} -- a list or set of twitter usernames or ids
+        (default: {None})
+        collection {str} -- database collection name (default: {None})
+        n_tweets{int} -- number of tweets to fetch (default: {5000})
+
+    Raises:
+        tweepy.TweepError: raised if a given username or user ID does not exist
+
+    Returns:
+        int, set -- total number of tweets retrieved, a set of error username
+        or user IDs
+    """
     total = len(users)
     total_tweet_count = 0
     error_ids = set()
@@ -439,7 +454,7 @@ def get_user_tweets_in_network(api=None, users=None, collection=None,
                 raise tweepy.TweepError('0 tweet was fetched, '
                                         f'{user} added to error ids.')
         except tweepy.TweepError as e:
-            print("XXXX Skipped {}, {}.\n".format(user, e))
+            logging.info("Skipped {}, {}.\n".format(user, e))
             error_ids.add(user)
         else:
             total_tweet_count += user_tweet_count
@@ -461,15 +476,15 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
         int -- number of user tweets
     """
 
-    logging.info(">>>  Processing {}'s tweets....".format(user))
+    logging.info("Processing {}'s tweets....".format(user))
 
     for counter, status in zip(count(start=1), tweepy.Cursor(api.user_timeline,
                                                              id=user).items(
                                                                  n_tweets)):
         # process status here
         if counter % 500 == 0 and counter != 0:
-            logging.info(f'>>>  Over {counter} tweets have been retrieved so '
-                         f'far ==> USER ID: {user}')
+            logging.info(f'{counter}+ tweets have been retrieved for '
+                         f'USER: {user}')
         tweet = status._json
         id_ = {"_id": tweet['id_str']}
         new_document = {**id_, **tweet}
@@ -479,7 +494,7 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
         except DuplicateKeyError:
             continue
 
-    logging.info(f'>>> Total number of tweets retrieved from {user}: '
+    logging.info(f'Total number of tweets retrieved for USER: {user}: '
                  f'{counter}')
 
     return counter

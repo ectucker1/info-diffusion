@@ -14,7 +14,7 @@ from dotenv import find_dotenv, load_dotenv
 
 from indiff import utils
 from indiff.features import build_features
-from indiff.twitter import (API, Tweet, get_user_tweets_in_network)
+from indiff.twitter import API, Tweet, get_user_tweets_in_network
 
 
 @click.command()
