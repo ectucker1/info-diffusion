@@ -151,7 +151,7 @@ def get_y(src, dest, node_collection):
     Returns:
         int -- return 1 if diffusion exists, else 0
     """
-    query = {'_id': user_id}
+    query = {'_id': dest}
     attr = node_collection.find_one(query)
 
     if src in attr['all_possible_original_tweet_owners']:

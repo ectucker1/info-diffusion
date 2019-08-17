@@ -164,7 +164,9 @@ def main(network_filepath, keywords_filepath):
             query = {"user.id_str": user_id}
             user_tweets = col.find(query)
 
-            for user_tweet in user_tweets:
+            bar = progressbar.ProgressBar(prefix=f"Computing {user_id}'s "
+                                          "Attributes: ")
+            for user_tweet in bar(user_tweets):
                 tweet = Tweet(user_tweet)
 
                 user['followers_count'] = tweet.owner_followers_count
@@ -234,13 +236,6 @@ def main(network_filepath, keywords_filepath):
                 if tweet.is_favourited:
                     user['favorite_tweets_count'] += 1
 
-                if users_mentioned_in_tweet:
-                    for other_user in users_mentioned_in_tweet:
-                        if other_user in social_network:
-                            social_network._node[other_user]['users_who_mentioned_me'].update(
-                                user_id)
-                            social_network._node[other_user]['mentioned_in'].update(tweet.id)
-
                 user['retweet_count'] += tweet.retweet_count
 
                 if tweet.is_retweeted:
@@ -282,12 +277,32 @@ def main(network_filepath, keywords_filepath):
                 logger.info(f'updating node attribute for {user_id}')
                 attr_collection.replace_one(id_, attr_collection)
 
+        # calculate extra attributes
+        for user_id in nx.nodes(social_network):
+            query = {"user.id_str": user_id}
+            user_tweets = col.find(query)
+
+            for user_tweet in user_tweets:
+                tweet = Tweet(user_tweet)
+                users_mentioned_in_tweet = tweet.users_mentioned
+                if users_mentioned_in_tweet:
+                    for other_user in users_mentioned_in_tweet:
+                        if other_user in social_network:
+                            query = {'_id': other_user}
+                            attr = attr_collection.find_one(query)
+
+                            attr['users_who_mentioned_me'].update(user_id)
+                            attr['mentioned_in'].update(tweet.id)
+                            attr_collection.replace_one(query, attr)
+
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
         # prepare table for dataframe
+        node_collection = db[filename + "-nodes"]
         results = build_features.calculate_network_diffusion(
-            nx.edges(social_network), keywords, graph=social_network,
-            additional_attr=True, do_not_add_sentiment=False)
+            nx.edges(social_network), keywords,
+            node_collection=node_collection, additional_attr=True,
+            do_not_add_sentiment=False)
 
         df = pd.DataFrame(results)
 
