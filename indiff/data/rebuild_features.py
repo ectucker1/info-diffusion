@@ -10,7 +10,7 @@ import pandas as pd
 import progressbar
 import requests
 from dotenv import find_dotenv, load_dotenv
-from sqlitedict import SqliteDict
+import pymongo
 
 from indiff import utils
 from indiff.features import build_features
@@ -33,9 +33,22 @@ def main(topic, keywords_filepath):
     filename = topic
     dataset_dir = os.path.join(datastore_root_dir, filename)
 
+    db_name = "infodiffusion"
+    collection_name = topic
+
     try:
         if not os.path.exists(dataset_dir):
             raise FileExistsError(f'Dataset for {filename} does not exists.')
+
+        myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+        mydb = myclient[db_name]
+
+        if db_name not in myclient.list_database_names():
+            raise ValueError(f"Database does not exist: {db_name}.")
+
+        mycol = mydb[collection_name]
+        if collection_name not in mydb.list_collection_names():
+            raise ValueError(f"Collection does not exist: {collection_name}.")
 
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logger.error(error)
@@ -67,7 +80,6 @@ def main(topic, keywords_filepath):
         if not os.path.exists(processed_path):
             os.makedirs(processed_path)
 
-        database_filepath = list(network_filepath.glob('*.sqlite'))[0]
         social_network_filepath = list(network_filepath.glob('*.adjlist'))[0]
 
         social_network = nx.read_adjlist(social_network_filepath,
@@ -123,120 +135,115 @@ def main(topic, keywords_filepath):
 
             nx.set_node_attributes(social_network, attr)
 
-        # get tweet ids that fulfil the date range of interest
-        with SqliteDict(filename=database_filepath.as_posix(),
-                        tablename='tweet-objects') as tweets:
-            # iterate over the tweets dataset to fetch desired result for nodes
-            bar = progressbar.ProgressBar(maxval=len(tweets)).start()
-            for tweet_id in bar(tweets):
-                status = tweets[tweet_id]
-                tweet = Tweet(status._json)
-                user_id = tweet.owner_id
+        bar = progressbar.ProgressBar()
+        for tweet in bar(mycol.find()):
+            tweet = Tweet(tweet)
+            user_id = tweet.owner_id
 
-                user = social_network._node[user_id]
+            user = social_network._node[user_id]
 
-                user['followers_count'] = tweet.owner_followers_count
-                user['friends_count'] = tweet.owner_friends_count
+            user['followers_count'] = tweet.owner_followers_count
+            user['friends_count'] = tweet.owner_friends_count
 
-                orig_owner_id = tweet.original_owner_id
-                if orig_owner_id != user_id:
-                    user['all_possible_original_tweet_owners'].add(
-                        orig_owner_id)
+            orig_owner_id = tweet.original_owner_id
+            if orig_owner_id != user_id:
+                user['all_possible_original_tweet_owners'].add(
+                    orig_owner_id)
 
-                user_description = tweet.owner_description
+            user_description = tweet.owner_description
 
-                if user_description:
-                    user['description'] = user_description
+            if user_description:
+                user['description'] = user_description
 
-                if tweet.is_retweeted_tweet:
-                    user['retweeted_tweets'][tweet_id] = tweet
+            if tweet.is_retweeted_tweet:
+                user['retweeted_tweets'][tweet.id] = tweet
 
-                    if tweet.hashtags:
-                        user['retweeted_tweets_with_hashtags'][tweet_id] = tweet
-                    if tweet.urls:
-                        user['retweeted_tweets_with_urls'][tweet_id] = tweet
-                    if tweet.media:
-                        user['retweeted_tweets_with_media'][tweet_id] = tweet
+                if tweet.hashtags:
+                    user['retweeted_tweets_with_hashtags'][tweet.id] = tweet
+                if tweet.urls:
+                    user['retweeted_tweets_with_urls'][tweet.id] = tweet
+                if tweet.media:
+                    user['retweeted_tweets_with_media'][tweet.id] = tweet
 
-                    users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_retweets'].update(
-                        users_mentioned_in_tweet)
+                users_mentioned_in_tweet = tweet.users_mentioned
+                user['users_mentioned_in_all_my_retweets'].update(
+                    users_mentioned_in_tweet)
 
-                    if tweet.is_others_mentioned:
-                        user['retweets_with_others_mentioned_count'] += 1
+                if tweet.is_others_mentioned:
+                    user['retweets_with_others_mentioned_count'] += 1
 
-                elif tweet.is_quoted_tweet:
-                    user['quoted_tweets'][tweet_id] = tweet
+            elif tweet.is_quoted_tweet:
+                user['quoted_tweets'][tweet.id] = tweet
 
-                    if tweet.hashtags:
-                        user['quoted_tweets_with_hashtags'][tweet_id] = tweet
-                    if tweet.urls:
-                        user['quoted_tweets_with_urls'][tweet_id] = tweet
-                    if tweet.media:
-                        user['quoted_tweets_with_media'][tweet_id] = tweet
+                if tweet.hashtags:
+                    user['quoted_tweets_with_hashtags'][tweet.id] = tweet
+                if tweet.urls:
+                    user['quoted_tweets_with_urls'][tweet.id] = tweet
+                if tweet.media:
+                    user['quoted_tweets_with_media'][tweet.id] = tweet
 
-                    users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_quoted_tweets'].update(
-                        users_mentioned_in_tweet)
+                users_mentioned_in_tweet = tweet.users_mentioned
+                user['users_mentioned_in_all_my_quoted_tweets'].update(
+                    users_mentioned_in_tweet)
 
-                    if tweet.is_others_mentioned:
-                        user['quoted_tweets_with_others_mentioned_count'] += 1
+                if tweet.is_others_mentioned:
+                    user['quoted_tweets_with_others_mentioned_count'] += 1
 
-                else:
-                    user['tweets'][tweet_id] = tweet
+            else:
+                user['tweets'][tweet.id] = tweet
 
-                    if tweet.hashtags:
-                        user['tweets_with_hashtags'][tweet_id] = tweet
-                    if tweet.urls:
-                        user['tweets_with_urls'][tweet_id] = tweet
-                    if tweet.media:
-                        user['tweets_with_media'][tweet_id] = tweet
+                if tweet.hashtags:
+                    user['tweets_with_hashtags'][tweet.id] = tweet
+                if tweet.urls:
+                    user['tweets_with_urls'][tweet.id] = tweet
+                if tweet.media:
+                    user['tweets_with_media'][tweet.id] = tweet
 
-                    users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_tweets'].update(
-                        users_mentioned_in_tweet)
+                users_mentioned_in_tweet = tweet.users_mentioned
+                user['users_mentioned_in_all_my_tweets'].update(
+                    users_mentioned_in_tweet)
 
-                    if tweet.is_others_mentioned:
-                        user['tweets_with_others_mentioned_count'] += 1
+                if tweet.is_others_mentioned:
+                    user['tweets_with_others_mentioned_count'] += 1
 
-                if tweet.is_favourited:
-                    user['favorite_tweets_count'] += 1
+            if tweet.is_favourited:
+                user['favorite_tweets_count'] += 1
 
-                if users_mentioned_in_tweet:
-                    for other_user in users_mentioned_in_tweet:
-                        if other_user in social_network:
-                            social_network._node[other_user]['users_who_mentioned_me'].update(user_id)
-                            social_network._node[other_user]['mentioned_in'].update(tweet_id)
+            if users_mentioned_in_tweet:
+                for other_user in users_mentioned_in_tweet:
+                    if other_user in social_network:
+                        social_network._node[other_user]['users_who_mentioned_me'].update(user_id)
+                        social_network._node[other_user]['mentioned_in'].update(tweet.id)
 
-                user['retweet_count'] += tweet.retweet_count
+            user['retweet_count'] += tweet.retweet_count
 
-                if tweet.is_retweeted:
-                    user['retweeted_count'] += 1
+            if tweet.is_retweeted:
+                user['retweeted_count'] += 1
 
-                user['keywords_in_all_my_tweets'].update(tweet.keywords)
+            user['keywords_in_all_my_tweets'].update(tweet.keywords)
 
-                if user['tweet_min_date'] == 0:
-                    user['tweet_min_date'] = tweet.created_at
+            if user['tweet_min_date'] == 0:
+                user['tweet_min_date'] = tweet.created_at
 
-                if user['tweet_max_date'] == 0:
-                    user['tweet_max_date'] = tweet.created_at
+            if user['tweet_max_date'] == 0:
+                user['tweet_max_date'] = tweet.created_at
 
-                if user['tweet_min_date'] > tweet.created_at:
-                    user['tweet_min_date'] = tweet.created_at
+            if user['tweet_min_date'] > tweet.created_at:
+                user['tweet_min_date'] = tweet.created_at
 
-                if user['tweet_max_date'] < tweet.created_at:
-                    user['tweet_max_date'] = tweet.created_at
+            if user['tweet_max_date'] < tweet.created_at:
+                user['tweet_max_date'] = tweet.created_at
 
-                # external_owner_id = tweet.original_owner_id
-                # if external_owner_id:
-                #     user['all_possible_original_tweet_owners'].add(
-                #         external_owner_id)
+            # external_owner_id = tweet.original_owner_id
+            # if external_owner_id:
+            #     user['all_possible_original_tweet_owners'].add(
+            #         external_owner_id)
 
-                # TODO: recalculate for neutral
-                if tweet.is_positive_sentiment:
-                    user['positive_sentiment_count'] += 1
-                else:
-                    user['negative_sentiment_count'] += 1
+            # TODO: recalculate for neutral
+            if tweet.is_positive_sentiment:
+                user['positive_sentiment_count'] += 1
+            else:
+                user['negative_sentiment_count'] += 1
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
