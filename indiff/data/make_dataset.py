@@ -285,16 +285,16 @@ def main(network_filepath, keywords_filepath):
         df = pd.DataFrame(results)
 
         # save processed dataset to hdf file
-        key = utils.generate_random_id(length=15)
+        key = filename
         processed_saveas = os.path.join(processed_path, 'dataset.h5')
-        df.to_hdf(processed_saveas, key=key)
+        df.to_hdf(processed_saveas, key=filename)
 
         # save key to reports directory
         key_saveas = os.path.join(reports_filepath, 'dataset.keys')
         with open(key_saveas, 'a') as f:
             f.write('\n***\n\nmake_dataset.py '
                     f'started at {current_date_and_time}')
-            f.write(f'\nKey: {key}\n\n')
+            f.write(f'\nKey: {filename}\n\n')
 
         nx.write_adjlist(social_network,
                          os.path.join(dataset_dir, f'{filename}.adjlist'),
