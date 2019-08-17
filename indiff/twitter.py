@@ -13,6 +13,8 @@ from sqlitedict import SqliteDict
 from .exception import WebBrowserError, WebDriverError
 from .utils import sentiment, split_text
 
+from pymongo.errors import DuplicateKeyError
+
 
 def _format_date(date):
     day = '0' + str(date.day) if len(str(date.day)) == 1 else str(date.day)
@@ -494,21 +496,23 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
 
     logging.info(">>>  Processing {}'s tweets....".format(user))
 
-    user_tweets = []
-    for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
-                                                      id=user).items(
-                                                          n_tweets)):
+    for counter, status in zip(count(start=1), tweepy.Cursor(api.user_timeline,
+                                                             id=user).items(
+                                                                 n_tweets)):
         # process status here
         if counter % 500 == 0 and counter != 0:
             logging.info(f'>>>  Over {counter} tweets have been retrieved so '
                          f'far ==> USER ID: {user}')
+        tweet = status._json
+        id_ = {"_id": tweet['id_str']}
+        new_document = {**id_, **tweet}
 
-        user_tweets.append(status._json)
-
-    x = collection.insert_many(user_tweets)
-    user_tweet_count = len(x.inserted_ids)
+        try:
+            collection.insert_one(new_document)
+        except DuplicateKeyError:
+            continue
 
     logging.info(f'>>> Total number of tweets retrieved from {user}: '
-                 f'{user_tweet_count}')
+                 f'{counter}')
 
-    return user_tweet_count
+    return counter
