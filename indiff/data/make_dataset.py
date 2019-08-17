@@ -285,7 +285,6 @@ def main(network_filepath, keywords_filepath):
         df = pd.DataFrame(results)
 
         # save processed dataset to hdf file
-        key = filename
         processed_saveas = os.path.join(processed_path, 'dataset.h5')
         df.to_hdf(processed_saveas, key=filename)
 
