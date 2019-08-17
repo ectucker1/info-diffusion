@@ -453,57 +453,62 @@ def get_user_tweets_and_build_tables(api, user_id, days, database_file_path,
     return counter
 
 
-def get_all_tweets_in_network_and_build_tables(api, user_ids,
-                                               database_file_path=None,
-                                               tablename='tweet-objects',
-                                               n_item=5000, days=30):
-    total = len(user_ids)
-    counter = 0
+def get_user_tweets_in_network(api=None, users=None, collection=None,
+                               n_tweets=5000):
+    total = len(users)
+    total_tweet_count = 0
     error_ids = set()
-    for i, user_id in zip(count(start=1), user_ids):
+
+    for i, user in zip(count(start=1), users):
         logging.info(f"PROCESSING {i} OF {total} USERS")
         try:
-            ct = get_max_user_tweets_and_build_tables(api, user_id,
-                                                      database_file_path,
-                                                      tablename=tablename)
+            user_tweet_count = get_user_tweets(api=api, user=user,
+                                               collection=collection,
+                                               n_tweets=n_tweets)
 
-            if not ct:
-                raise tweepy.TweepError('0 tweet was fetched and would add '
-                                        f'{user_id} to error ids')
-            counter += ct
+            if not user_tweet_count:
+                raise tweepy.TweepError('0 tweet was fetched, '
+                                        f'{user} added to error ids.')
         except tweepy.TweepError as e:
-            print("XXXX Skipped {}, {}.\n".format(user_id, e))
-            error_ids.add(user_id)
+            print("XXXX Skipped {}, {}.\n".format(user, e))
+            error_ids.add(user)
+        else:
+            total_tweet_count += user_tweet_count
 
-    return counter, error_ids
+    return total_tweet_count, error_ids
 
 
-def get_user_tweets(api=None, user_id=None, collection=None, n_tweets=5000):
+def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
     """Fetches a user tweets into database.
 
     Keyword Arguments:
         api {Tweepy} -- wrapper for the API as provided by Twitter
         (default: {None})
-        user_id {str} -- twitter user ID (default: {None})
+        user {str} -- twitter username or ID (default: {None})
         collection {str} -- database collection name (default: {None})
         n_tweets{int} -- number of tweets to fetch (default: {5000})
+
+    Returns:
+        int -- number of user tweets
     """
 
-    logging.info(">>>  Processing {}'s tweets....".format(user_id))
+    logging.info(">>>  Processing {}'s tweets....".format(user))
 
     user_tweets = []
     for counter, status in zip(count(), tweepy.Cursor(api.user_timeline,
-                                                      id=user_id).items(
+                                                      id=user).items(
                                                           n_tweets)):
         # process status here
         if counter % 500 == 0 and counter != 0:
             logging.info(f'>>>  Over {counter} tweets have been retrieved so '
-                         f'far ==> USER ID: {user_id}')
+                         f'far ==> USER ID: {user}')
 
         user_tweets.append(status._json)
 
     x = collection.insert_many(user_tweets)
     user_tweet_count = len(x.inserted_ids)
 
-    logging.info(f'>>> Total number of tweets retrieved from {user_id}: '
+    logging.info(f'>>> Total number of tweets retrieved from {user}: '
                  f'{user_tweet_count}')
+
+    return user_tweet_count
