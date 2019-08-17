@@ -1,31 +1,22 @@
 # -*- coding: utf-8 -*-
-import datetime
 import logging
 import os
 from pathlib import Path
 
 import click
-import networkx as nx
-import pandas as pd
 import progressbar
-import requests
+import pymongo
 from dotenv import find_dotenv, load_dotenv
 from sqlitedict import SqliteDict
-
-from indiff import utils
-from indiff.features import build_features
-from indiff.twitter import Tweet
 
 
 @click.command()
 @click.argument('topic')
-@click.argument('keywords_filepath', type=click.Path(exists=True))
-def main(topic, keywords_filepath):
+def main(topic):
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
     logger = logging.getLogger(__name__)
-    current_date_and_time = datetime.datetime.now()
 
     # root directories
     root_dir = Path(__file__).resolve().parents[2]
@@ -37,15 +28,11 @@ def main(topic, keywords_filepath):
         if not os.path.exists(dataset_dir):
             raise FileExistsError(f'Dataset for {filename} does not exists.')
 
+        myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logger.error(error)
-    except requests.HTTPError as e:
-        logger.error("Checking internet connection failed, "
-                     f"status code {e.response.status_code}")
-    except requests.ConnectionError:
-        logger.error("No internet connection available.")
     else:
-
         dataset_filepath = Path(dataset_dir)
         parts = list(dataset_filepath.parts)
         parts[6] = 'reports'
@@ -68,11 +55,7 @@ def main(topic, keywords_filepath):
             os.makedirs(processed_path)
 
         database_filepath = list(network_filepath.glob('*.sqlite'))[0]
-        social_network_filepath = list(network_filepath.glob('*.adjlist'))[0]
-
-        social_network = nx.read_adjlist(social_network_filepath,
-                                         delimiter=',',
-                                         create_using=nx.DiGraph)
+        # social_network_filepath = list(network_filepath.glob('*.adjlist'))[0]
 
         # infer path to write corresponding reports
         # change 'data' to 'reports'
@@ -82,13 +65,19 @@ def main(topic, keywords_filepath):
         parts.pop(7)
         reports_filepath = Path(*parts)
 
+        mydb = myclient["infodiffusion"]
+        mycol = mydb[topic]
+
         # get tweet ids that fulfil the date range of interest
         with SqliteDict(filename=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
             # iterate over the tweets dataset to fetch desired result for nodes
-            bar = progressbar.ProgressBar(maxval=len(tweets)).start()
+            bar = progressbar.ProgressBar(maxval=len(tweets),
+                                          prefix='Exporting Tweets: ')
             for tweet_id in bar(tweets):
                 # export to mongodb
+                tweet_ = tweets[tweet_id]._json
+                _ = mycol.insert_one(tweet_)
 
 
 if __name__ == '__main__':
