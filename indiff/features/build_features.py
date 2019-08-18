@@ -38,7 +38,7 @@ def users_ever_mentioned(user_id, node_collection):  # get_users_mentioned_in
     """notation 7"""
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
-    return attr['users_mentioned_in_all_my_tweets']
+    return set(attr['users_mentioned_in_all_my_tweets'])
 
 
 def get_h(src_user, dest_user, node_collection):
@@ -84,7 +84,7 @@ def tweets_mentioned_in(user_id, node_collection):
     """notation 9"""
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
-    return attr['mentioned_in']
+    return set(attr['mentioned_in'])
 
 
 def get_mR(user_id, node_collection, meu=200):
@@ -100,7 +100,7 @@ def get_keywords_from_user_tweets(user_id, node_collection):
     """notation 12"""
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
-    return attr['keywords_in_all_my_tweets']
+    return set(attr['keywords_in_all_my_tweets'])
 
 
 def get_hK(user_id, keywords, node_collection):
@@ -154,7 +154,7 @@ def get_y(src, dest, node_collection):
     query = {'_id': dest}
     attr = node_collection.find_one(query)
 
-    if src in attr['all_possible_original_tweet_owners']:
+    if src in set(attr['all_possible_original_tweet_owners']):
         return 1
     else:
         return 0

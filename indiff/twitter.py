@@ -454,7 +454,7 @@ def get_user_tweets_in_network(api=None, users=None, collection=None,
                 raise tweepy.TweepError('0 tweet was fetched, '
                                         f'{user} added to error ids.')
         except tweepy.TweepError as e:
-            logging.info("Skipped {}, {}.\n".format(user, e))
+            logging.error("Skipped {}, {}.\n".format(user, e))
             error_ids.add(user)
         else:
             total_tweet_count += user_tweet_count
@@ -476,7 +476,7 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
         int -- number of user tweets
     """
 
-    logging.info("Processing {}'s tweets....".format(user))
+    logging.info("Fetching {}'s tweets....".format(user))
 
     for counter, status in zip(count(start=1), tweepy.Cursor(api.user_timeline,
                                                              id=user).items(
@@ -492,6 +492,7 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
         try:
             collection.insert_one(new_document)
         except DuplicateKeyError:
+            logging.info('found duplicate key')
             continue
 
     logging.info(f'Total number of tweets retrieved for USER: {user}: '

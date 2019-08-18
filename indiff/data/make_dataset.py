@@ -2,6 +2,7 @@
 import datetime
 import logging
 import os
+from itertools import count
 from pathlib import Path
 
 import click
@@ -83,7 +84,8 @@ def main(network_filepath, keywords_filepath):
         logger.info('downloading data set from raw data')
         tweet_count, error_ids = get_user_tweets_in_network(api=api,
                                                             users=nodes,
-                                                            collection=col)
+                                                            collection=col,
+                                                            n_tweets=50)
 
         logger.info('removing ids with error from graph')
         social_network.remove_nodes_from(error_ids)
@@ -123,23 +125,23 @@ def main(network_filepath, keywords_filepath):
         reports_filepath = Path(*parts)
 
         # initialise node attributes to have desired info from dataset
-        # bar = progressbar.ProgressBar(prefix='Computing Node Attributes: ')
-        for user_id in nx.nodes(social_network):
+        user_ids = nx.nodes(social_network)
+        n_user_ids = len(user_ids)
+        for i, user_id in zip(count(start=1), user_ids):
+            logging.info(f"PROCESSING NODE ATTR FOR {i} OF {n_user_ids} USERS")
             user = {'tweets': dict(),
                     'tweets_with_hashtags': dict(),
                     'tweets_with_urls': dict(),
                     'tweets_with_media': dict(),
-                    'users_who_mentioned_me': set(),
                     'tweets_with_others_mentioned_count': 0,
-                    'mentioned_in': set(),
-                    'users_mentioned_in_all_my_tweets': set(),
-                    'keywords_in_all_my_tweets': set(),
-                    'all_possible_original_tweet_owners': set(),
+                    'mentioned_in': [],
+                    'users_mentioned_in_all_my_tweets': [],
+                    'keywords_in_all_my_tweets': [],
+                    'all_possible_original_tweet_owners': [],
                     'retweeted_tweets': dict(),
                     'retweeted_tweets_with_hashtags': dict(),
                     'retweeted_tweets_with_urls': dict(),
                     'retweeted_tweets_with_media': dict(),
-                    'users_mentioned_in_all_my_retweets': set(),
                     'retweets_with_others_mentioned_count': 0,
                     'retweet_count': 0,
                     'retweeted_count': 0,
@@ -147,7 +149,6 @@ def main(network_filepath, keywords_filepath):
                     'quoted_tweets_with_hashtags': dict(),
                     'quoted_tweets_with_urls': dict(),
                     'quoted_tweets_with_media': dict(),
-                    'users_mentioned_in_all_my_quoted_tweets': set(),
                     'quoted_tweets_with_others_mentioned_count': 0,
                     'description': None,
                     'favorite_tweets_count': 0,
@@ -174,7 +175,7 @@ def main(network_filepath, keywords_filepath):
 
                 orig_owner_id = tweet.original_owner_id
                 if orig_owner_id != user_id:
-                    user['all_possible_original_tweet_owners'].add(
+                    user['all_possible_original_tweet_owners'].append(
                         orig_owner_id)
 
                 user_description = tweet.owner_description
@@ -183,51 +184,43 @@ def main(network_filepath, keywords_filepath):
                     user['description'] = user_description
 
                 if tweet.is_retweeted_tweet:
-                    user['retweeted_tweets'][tweet.id] = tweet
+                    user['retweeted_tweets'][tweet.id] = tweet.tweet
 
                     if tweet.hashtags:
-                        user['retweeted_tweets_with_hashtags'][tweet.id] = tweet
+                        user['retweeted_tweets_with_hashtags'][tweet.id] = tweet.tweet
                     if tweet.urls:
-                        user['retweeted_tweets_with_urls'][tweet.id] = tweet
+                        user['retweeted_tweets_with_urls'][tweet.id] = tweet.tweet
                     if tweet.media:
-                        user['retweeted_tweets_with_media'][tweet.id] = tweet
-
-                    users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_retweets'].update(
-                        users_mentioned_in_tweet)
+                        user['retweeted_tweets_with_media'][tweet.id] = tweet.tweet
 
                     if tweet.is_others_mentioned:
                         user['retweets_with_others_mentioned_count'] += 1
 
                 elif tweet.is_quoted_tweet:
-                    user['quoted_tweets'][tweet.id] = tweet
+                    user['quoted_tweets'][tweet.id] = tweet.tweet
 
                     if tweet.hashtags:
-                        user['quoted_tweets_with_hashtags'][tweet.id] = tweet
+                        user['quoted_tweets_with_hashtags'][tweet.id] = tweet.tweet
                     if tweet.urls:
-                        user['quoted_tweets_with_urls'][tweet.id] = tweet
+                        user['quoted_tweets_with_urls'][tweet.id] = tweet.tweet
                     if tweet.media:
-                        user['quoted_tweets_with_media'][tweet.id] = tweet
-
-                    users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_quoted_tweets'].update(
-                        users_mentioned_in_tweet)
+                        user['quoted_tweets_with_media'][tweet.id] = tweet.tweet
 
                     if tweet.is_others_mentioned:
                         user['quoted_tweets_with_others_mentioned_count'] += 1
 
                 else:
-                    user['tweets'][tweet.id] = tweet
+                    user['tweets'][tweet.id] = tweet.tweet
 
                     if tweet.hashtags:
-                        user['tweets_with_hashtags'][tweet.id] = tweet
+                        user['tweets_with_hashtags'][tweet.id] = tweet.tweet
                     if tweet.urls:
-                        user['tweets_with_urls'][tweet.id] = tweet
+                        user['tweets_with_urls'][tweet.id] = tweet.tweet
                     if tweet.media:
-                        user['tweets_with_media'][tweet.id] = tweet
+                        user['tweets_with_media'][tweet.id] = tweet.tweet
 
                     users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_tweets'].update(
+                    user['users_mentioned_in_all_my_tweets'].append(
                         users_mentioned_in_tweet)
 
                     if tweet.is_others_mentioned:
@@ -241,7 +234,7 @@ def main(network_filepath, keywords_filepath):
                 if tweet.is_retweeted:
                     user['retweeted_count'] += 1
 
-                user['keywords_in_all_my_tweets'].update(tweet.keywords)
+                user['keywords_in_all_my_tweets'].append(tweet.keywords)
 
                 if user['tweet_min_date'] == 0:
                     user['tweet_min_date'] = tweet.created_at
@@ -269,13 +262,16 @@ def main(network_filepath, keywords_filepath):
             # write node attributes as document to database
             attr_collection = db[filename + "-nodes"]
             id_ = {"_id": user_id}
-            new_document = {**id_, **attr_collection}
+            new_document = {**id_, **user}
 
             try:
                 attr_collection.insert_one(new_document)
             except pymongo.errors.DuplicateKeyError:
                 logger.info(f'updating node attribute for {user_id}')
                 attr_collection.replace_one(id_, attr_collection)
+
+        # free user memory from previous ieration
+        del user
 
         # calculate extra attributes
         for user_id in nx.nodes(social_network):
@@ -290,9 +286,7 @@ def main(network_filepath, keywords_filepath):
                         if other_user in social_network:
                             query = {'_id': other_user}
                             attr = attr_collection.find_one(query)
-
-                            attr['users_who_mentioned_me'].update(user_id)
-                            attr['mentioned_in'].update(tweet.id)
+                            attr['mentioned_in'].append(tweet.id)
                             attr_collection.replace_one(query, attr)
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
