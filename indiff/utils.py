@@ -52,7 +52,7 @@ def split_text(tweet_text):
 
     # returns a list of keywords in one message
     # consider return a generator maybe?
-    return final
+    return list(final)
 
 
 def clean_tweet(tweet):

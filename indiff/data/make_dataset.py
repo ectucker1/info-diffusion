@@ -220,7 +220,7 @@ def main(network_filepath, keywords_filepath):
                         user['tweets_with_media'][tweet.id] = tweet.tweet
 
                     users_mentioned_in_tweet = tweet.users_mentioned
-                    user['users_mentioned_in_all_my_tweets'].append(
+                    user['users_mentioned_in_all_my_tweets'].extend(
                         users_mentioned_in_tweet)
 
                     if tweet.is_others_mentioned:
@@ -234,7 +234,7 @@ def main(network_filepath, keywords_filepath):
                 if tweet.is_retweeted:
                     user['retweeted_count'] += 1
 
-                user['keywords_in_all_my_tweets'].append(tweet.keywords)
+                user['keywords_in_all_my_tweets'].extend(tweet.keywords)
 
                 if user['tweet_min_date'] == 0:
                     user['tweet_min_date'] = tweet.created_at
