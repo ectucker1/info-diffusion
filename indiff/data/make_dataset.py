@@ -170,18 +170,20 @@ def main(network_filepath, keywords_filepath):
             for user_tweet in bar(user_tweets):
                 tweet = Tweet(user_tweet)
 
-                user['followers_count'] = tweet.owner_followers_count
-                user['friends_count'] = tweet.owner_friends_count
+                if not user['followers_count']:
+                    user['followers_count'] = tweet.owner_followers_count
+
+                if not user['friends_count']:
+                    user['friends_count'] = tweet.owner_friends_count
+
+                user_description = tweet.owner_description
+                if user_description and user['description'] is not None:
+                    user['description'] = user_description
 
                 orig_owner_id = tweet.original_owner_id
                 if orig_owner_id != user_id:
                     user['all_possible_original_tweet_owners'].append(
                         orig_owner_id)
-
-                user_description = tweet.owner_description
-
-                if user_description:
-                    user['description'] = user_description
 
                 if tweet.is_retweeted_tweet:
                     user['retweeted_tweets'][tweet.id] = tweet.tweet
@@ -195,7 +197,6 @@ def main(network_filepath, keywords_filepath):
 
                     if tweet.is_others_mentioned:
                         user['retweets_with_others_mentioned_count'] += 1
-
                 elif tweet.is_quoted_tweet:
                     user['quoted_tweets'][tweet.id] = tweet.tweet
 
@@ -208,7 +209,6 @@ def main(network_filepath, keywords_filepath):
 
                     if tweet.is_others_mentioned:
                         user['quoted_tweets_with_others_mentioned_count'] += 1
-
                 else:
                     user['tweets'][tweet.id] = tweet.tweet
 
