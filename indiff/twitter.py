@@ -492,7 +492,7 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
         try:
             collection.insert_one(new_document)
         except DuplicateKeyError:
-            logging.info('found duplicate key')
+            logging.info(f"found duplicate key: {tweet['id_str']}")
             continue
 
     logging.info(f'Total number of tweets retrieved for USER: {user}: '

@@ -60,9 +60,10 @@ def main(network_filepath, keywords_filepath):
 
         api = auth()
 
-        myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+        myclient = pymongo.MongoClient('localhost', 27017)
         db = myclient[db_name]
         col = db[filename]
+        node_collection = db[filename + "-nodes"]
 
         # build initial graph from file
         social_network = nx.read_edgelist(network_filepath, delimiter=',',
@@ -129,26 +130,26 @@ def main(network_filepath, keywords_filepath):
         n_user_ids = len(user_ids)
         for i, user_id in zip(count(start=1), user_ids):
             logging.info(f"PROCESSING NODE ATTR FOR {i} OF {n_user_ids} USERS")
-            user = {'tweets': dict(),
-                    'tweets_with_hashtags': dict(),
-                    'tweets_with_urls': dict(),
-                    'tweets_with_media': dict(),
+            user = {'tweets': [],
+                    'n_tweets_with_hashtags': 0,
+                    'n_tweets_with_urls': 0,
+                    'n_tweets_with_media': 0,
                     'tweets_with_others_mentioned_count': 0,
                     'mentioned_in': [],
                     'users_mentioned_in_all_my_tweets': [],
                     'keywords_in_all_my_tweets': [],
                     'all_possible_original_tweet_owners': [],
-                    'retweeted_tweets': dict(),
-                    'retweeted_tweets_with_hashtags': dict(),
-                    'retweeted_tweets_with_urls': dict(),
-                    'retweeted_tweets_with_media': dict(),
+                    'retweeted_tweets': [],
+                    'n_retweeted_tweets_with_hashtags': 0,
+                    'n_retweeted_tweets_with_urls': 0,
+                    'n_retweeted_tweets_with_media': 0,
                     'retweets_with_others_mentioned_count': 0,
                     'retweet_count': 0,
                     'retweeted_count': 0,
-                    'quoted_tweets': dict(),
-                    'quoted_tweets_with_hashtags': dict(),
-                    'quoted_tweets_with_urls': dict(),
-                    'quoted_tweets_with_media': dict(),
+                    'quoted_tweets': [],
+                    'n_quoted_tweets_with_hashtags': 0,
+                    'n_quoted_tweets_with_urls': 0,
+                    'n_quoted_tweets_with_media': 0,
                     'quoted_tweets_with_others_mentioned_count': 0,
                     'description': None,
                     'favorite_tweets_count': 0,
@@ -186,38 +187,38 @@ def main(network_filepath, keywords_filepath):
                         orig_owner_id)
 
                 if tweet.is_retweeted_tweet:
-                    user['retweeted_tweets'][tweet.id] = tweet.tweet
+                    user['retweeted_tweets'].append(tweet.id)
 
                     if tweet.hashtags:
-                        user['retweeted_tweets_with_hashtags'][tweet.id] = tweet.tweet
+                        user['n_retweeted_tweets_with_hashtags'] += 1
                     if tweet.urls:
-                        user['retweeted_tweets_with_urls'][tweet.id] = tweet.tweet
+                        user['n_retweeted_tweets_with_urls'] += 1
                     if tweet.media:
-                        user['retweeted_tweets_with_media'][tweet.id] = tweet.tweet
+                        user['n_retweeted_tweets_with_media'] += 1
 
                     if tweet.is_others_mentioned:
                         user['retweets_with_others_mentioned_count'] += 1
                 elif tweet.is_quoted_tweet:
-                    user['quoted_tweets'][tweet.id] = tweet.tweet
+                    user['quoted_tweets'].append(tweet.id)
 
                     if tweet.hashtags:
-                        user['quoted_tweets_with_hashtags'][tweet.id] = tweet.tweet
+                        user['n_quoted_tweets_with_hashtags'] += 1
                     if tweet.urls:
-                        user['quoted_tweets_with_urls'][tweet.id] = tweet.tweet
+                        user['n_quoted_tweets_with_urls'] += 1
                     if tweet.media:
-                        user['quoted_tweets_with_media'][tweet.id] = tweet.tweet
+                        user['n_quoted_tweets_with_media'] += 1
 
                     if tweet.is_others_mentioned:
                         user['quoted_tweets_with_others_mentioned_count'] += 1
                 else:
-                    user['tweets'][tweet.id] = tweet.tweet
+                    user['tweets'].append(tweet.id)
 
                     if tweet.hashtags:
-                        user['tweets_with_hashtags'][tweet.id] = tweet.tweet
+                        user['n_tweets_with_hashtags'] += 1
                     if tweet.urls:
-                        user['tweets_with_urls'][tweet.id] = tweet.tweet
+                        user['n_tweets_with_urls'] += 1
                     if tweet.media:
-                        user['tweets_with_media'][tweet.id] = tweet.tweet
+                        user['n_tweets_with_media'] += 1
 
                     users_mentioned_in_tweet = tweet.users_mentioned
                     user['users_mentioned_in_all_my_tweets'].extend(
@@ -260,20 +261,23 @@ def main(network_filepath, keywords_filepath):
                     user['negative_sentiment_count'] += 1
 
             # write node attributes as document to database
-            attr_collection = db[filename + "-nodes"]
             id_ = {"_id": user_id}
             new_document = {**id_, **user}
 
             try:
-                attr_collection.insert_one(new_document)
+                node_collection.insert_one(new_document)
             except pymongo.errors.DuplicateKeyError:
                 logger.info(f'updating node attribute for {user_id}')
-                attr_collection.replace_one(id_, attr_collection)
+                node_collection.replace_one(id_, new_document)
 
         # free user memory from previous ieration
         del user
 
         # calculate extra attributes
+        # TODO: look for a way to make this computationally effecient since
+        # we can now query a database and just change a particular part of the
+        # database.
+        logger.info('building extra features')
         for user_id in nx.nodes(social_network):
             query = {"user.id_str": user_id}
             user_tweets = col.find(query)
@@ -285,31 +289,34 @@ def main(network_filepath, keywords_filepath):
                     for other_user in users_mentioned_in_tweet:
                         if other_user in social_network:
                             query = {'_id': other_user}
-                            attr = attr_collection.find_one(query)
+                            attr = node_collection.find_one(query)
                             attr['mentioned_in'].append(tweet.id)
-                            attr_collection.replace_one(query, attr)
+                            node_collection.replace_one(query, attr)
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
         # prepare table for dataframe
-        node_collection = db[filename + "-nodes"]
         results = build_features.calculate_network_diffusion(
             nx.edges(social_network), keywords,
-            node_collection=node_collection, additional_attr=True,
+            node_collection=node_collection, tweet_collection=col,
+            additional_attr=True,
             do_not_add_sentiment=False)
 
         df = pd.DataFrame(results)
 
         # save processed dataset to hdf file
+        key = utils.generate_random_id(15)
         processed_saveas = os.path.join(processed_path, 'dataset.h5')
-        df.to_hdf(processed_saveas, key=filename)
+        df.to_hdf(processed_saveas, key=key)
 
         # save key to reports directory
         key_saveas = os.path.join(reports_filepath, 'dataset.keys')
         with open(key_saveas, 'a') as f:
             f.write('\n***\n\nmake_dataset.py '
                     f'started at {current_date_and_time}')
-            f.write(f'\nKey: {filename}\n\n')
+            f.write(f'Network path: {network_filepath}')
+            f.write(f'Topic: {filename}')
+            f.write(f'\nKey: {key}\n\n')
 
         nx.write_adjlist(social_network,
                          os.path.join(dataset_dir, f'{filename}.adjlist'),
