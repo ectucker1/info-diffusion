@@ -44,7 +44,7 @@ def main(topic):
 
         # get tweet ids that fulfil the date range of interest
         logger.info("Export tweets from sqlite to mongodb")
-        with SqliteDict(topic=database_filepath.as_posix(),
+        with SqliteDict(filename=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
             # iterate over the tweets dataset to fetch desired result for nodes
             bar = progressbar.ProgressBar(maxval=len(tweets),
