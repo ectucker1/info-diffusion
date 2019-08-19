@@ -114,6 +114,7 @@ def main(topic, keywords_filepath):
                     'friends_ids': [],
                     'tweet_min_date': 0,
                     'tweet_max_date': 0,
+                    'n_tweets_with_user_mentions': 0,
                     }
 
             query = {"user.id_str": user_id}
@@ -213,6 +214,10 @@ def main(topic, keywords_filepath):
                     user['positive_sentiment_count'] += 1
                 else:
                     user['negative_sentiment_count'] += 1
+
+                # calculate n_tweets_with_user_mentions
+                if tweet.users_mentioned:
+                    user['n_tweets_with_user_mentions'] += 1
 
                 tweet_count += 1
             total_tweet_count += tweet_count

@@ -224,10 +224,6 @@ class Tweet(object):
         if not users_mentions:
             return users_mentions
 
-        # makes sure the user is not included in the returned users_mentioned
-        return [user['id_str']
-                for user in users_mentions if user['id_str'] != self.id]
-
     @property
     def owner_description(self):
         """[summary]

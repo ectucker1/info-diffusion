@@ -56,27 +56,15 @@ def get_h(src_user, dest_user, node_collection):
         return 0
 
 
-def number_of_tweets_with_user_mentions(user_id, node_collection,
-                                        tweet_collection):
-    tweet_ids = get_user_published_tweets(user_id, node_collection)
-
-    count = 0
-
-    for tweet_id in tweet_ids:
-        query = {'_id': tweet_id}
-        doc = tweet_collection.find_one(
-            query, {"_id": 0, "entities.user_mentions": 1})
-        user_mentions = doc['entities']['user_mentions']
-        if user_mentions:
-            count += 1
-
-    return count
+def number_of_tweets_with_user_mentions(user_id, node_collection):
+    query = {'_id': user_id}
+    attr = node_collection.find_one(query)
+    return set(attr['n_tweets_with_user_mentions'])
 
 
-def get_dTR(user_id, node_collection, tweet_collection):
+def get_dTR(user_id, node_collection):
     # change dv..... mv is okay
-    n_dv = number_of_tweets_with_user_mentions(user_id, node_collection,
-                                               tweet_collection)
+    n_dv = number_of_tweets_with_user_mentions(user_id, node_collection)
     mv = get_user_published_tweets(user_id, node_collection)
 
     if len(mv) > 0:
@@ -186,8 +174,8 @@ def generate_default_attr(src_user, dest_user, keywords, node_collection,
         'src_I': get_activity_index(src_user, node_collection),
         'dest_I': get_activity_index(dest_user, node_collection),
         'H': get_h(src_user, dest_user, node_collection),
-        'src_dTR': get_dTR(src_user, node_collection, tweet_collection),
-        'dest_dTR': get_dTR(dest_user, node_collection, tweet_collection),
+        'src_dTR': get_dTR(src_user, node_collection),
+        'dest_dTR': get_dTR(dest_user, node_collection),
         'src_hM': get_hM(src_user, dest_user, node_collection),
         'dest_hM': get_hM(dest_user, src_user, node_collection),
         'src_mR': get_mR(src_user, node_collection),
