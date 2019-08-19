@@ -10,7 +10,6 @@ import networkx as nx
 import pandas as pd
 import progressbar
 import pymongo
-import requests
 from dotenv import find_dotenv, load_dotenv
 
 from indiff import utils
@@ -37,29 +36,32 @@ def main(topic, keywords_filepath):
     db_name = "info-diffusion"
 
     try:
-        myclient = pymongo.MongoClient('localhost', 27017)
-        db = myclient[db_name]
+        if not os.path.exists(topic_raw_data_dir):
+            raise FileExistsError(f'Dataset for {topic} does not exists.')
+
+        client = pymongo.MongoClient('localhost', 27017)
+        db = client[db_name]
         col = db[topic]
         node_collection = db[topic + "-nodes"]
 
-        # build initial graph from file
-        social_network = nx.read_edgelist(topic, delimiter=',',
-                                          create_using=nx.DiGraph())
-    except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
-        logger.error(error)
-    except requests.HTTPError as e:
-        logger.error("Checking internet connection failed, "
-                     f"status code {e.response.status_code}")
-    except requests.ConnectionError:
-        logger.error("No internet connection available.")
-    else:
+        if db_name not in client.list_database_names():
+            raise ValueError(f"Database does not exist: {db_name}.")
 
-        if not os.path.exists(topic_raw_data_dir):
-            os.makedirs(topic_raw_data_dir)
-
-        social_network.name = topic
+        if topic not in db.list_collection_names():
+            raise ValueError(f"Collection does not exist: {topic}.")
 
         topic_raw_data_dir = Path(topic_raw_data_dir)
+
+        social_network_filepath = list(topic_raw_data_dir.glob('*.adjlist'))[0]
+
+        # build initial graph from file
+        social_network = nx.read_adjlist(social_network_filepath,
+                                         delimiter=',',
+                                         create_using=nx.DiGraph)
+    except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
+        logger.error(error)
+    else:
+        social_network.name = topic
 
         # processed file path
         parts = list(topic_raw_data_dir.parts)
@@ -76,6 +78,7 @@ def main(topic, keywords_filepath):
         topic_reports_dir = Path(*parts)
 
         # initialise node attributes to have desired info from dataset
+        total_tweet_count = 0
         user_ids = nx.nodes(social_network)
         n_user_ids = len(user_ids)
         for i, user_id in zip(count(start=1), user_ids):
@@ -116,6 +119,7 @@ def main(topic, keywords_filepath):
             query = {"user.id_str": user_id}
             user_tweets = col.find(query)
 
+            tweet_count = 0
             bar = progressbar.ProgressBar(prefix=f"Computing {user_id}'s "
                                           "Attributes: ")
             for user_tweet in bar(user_tweets):
@@ -210,6 +214,8 @@ def main(topic, keywords_filepath):
                 else:
                     user['negative_sentiment_count'] += 1
 
+                tweet_count += 1
+            total_tweet_count += tweet_count
             # write node attributes as document to database
             id_ = {"_id": user_id}
             new_document = {**id_, **user}
@@ -285,7 +291,7 @@ def main(topic, keywords_filepath):
             f.write(f'###* Info for {topic}, started at '
                     f'{current_date_and_time}.\n#\n#\n')
             f.write(nx.info(social_network))
-            f.write(f'\nNumber of tweets: {tweet_count}')
+            f.write(f'\nNumber of tweets: {total_tweet_count}')
 
 
 if __name__ == '__main__':

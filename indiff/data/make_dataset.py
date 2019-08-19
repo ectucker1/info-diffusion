@@ -79,13 +79,13 @@ def main(network_filepath, keywords_filepath):
         if not os.path.exists(topic_raw_data_dir):
             os.makedirs(topic_raw_data_dir)
 
-        nodes = social_network.nodes()
+        user_ids = nx.nodes(social_network)
 
         logger.info('downloading data set from raw data')
         tweet_count, error_ids = get_user_tweets_in_network(api=api,
-                                                            users=nodes,
+                                                            users=user_ids,
                                                             collection=col,
-                                                            n_tweets=50)
+                                                            n_tweets=1000000)
 
         logger.info('removing ids with error from graph')
         social_network.remove_nodes_from(error_ids)
@@ -112,7 +112,6 @@ def main(network_filepath, keywords_filepath):
         topic_reports_dir = Path(*parts)
 
         # initialise node attributes to have desired info from dataset
-        user_ids = nx.nodes(social_network)
         n_user_ids = len(user_ids)
         for i, user_id in zip(count(start=1), user_ids):
             logging.info(f"PROCESSING NODE ATTR FOR {i} OF {n_user_ids} USERS")
