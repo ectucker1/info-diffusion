@@ -245,6 +245,7 @@ def main(network_filepath, keywords_filepath):
                     user['positive_sentiment_count'] += 1
                 else:
                     user['negative_sentiment_count'] += 1
+
                 # calculate n_tweets_with_user_mentions
                 if tweet.users_mentioned:
                     user['n_tweets_with_user_mentions'] += 1
