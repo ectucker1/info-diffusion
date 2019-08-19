@@ -133,12 +133,7 @@ def get_A(user_id, node_collection, tweet_collection, hour=None):
 
     tweet_ids = get_user_published_tweets(user_id, node_collection)
 
-    tweet_dates = []
-    for tweet_id in tweet_ids:
-        query = {'_id': tweet_id}
-        doc = tweet_collection.find_one(query, {"_id": 0, "created_at": 1})
-        created_at = doc['created_at']
-        tweet_dates.append(created_at)
+    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
 
     N = len(tweet_ids)
 
@@ -310,8 +305,8 @@ def calculate_network_diffusion(edges, keywords, node_collection,
     # way of knowing the number of things calculated
     # changed results.append to yield
 
-    widgets = ['Building Features, ',
-               progressbar.Counter('Processed %(value)03d'),
+    widgets = ['Computing Diffusion, ',
+               progressbar.Counter('Processed %(value)02d'),
                ' edges (', progressbar.Timer(), ')']
     bar = progressbar.ProgressBar(widgets=widgets)
     for src_user, dest_user in bar(edges):
@@ -662,6 +657,14 @@ def avg_negative_sentiment_of_tweets(user_id, node_collection):
     return number_of_negative_sentiments / total_number_of_tweets
 
 
+def get_tweet_dates_from_collection(tweet_ids, tweet_collection):
+    for tweet_id in tweet_ids:
+        query = {'_id': tweet_id}
+        doc = tweet_collection.find_one(query, {"_id": 0, "created_at": 1})
+        created_at = doc['created_at']
+        yield(created_at)
+
+
 def ratio_of_tweet_per_time_period(user_id, node_collection, tweet_collection):
     """ separate tweets in 4 periods using the hour attribute
 
@@ -676,12 +679,7 @@ def ratio_of_tweet_per_time_period(user_id, node_collection, tweet_collection):
 
     periods = Counter()
 
-    tweet_dates = []
-    for tweet_id in tweet_ids:
-        query = {'_id': tweet_id}
-        doc = tweet_collection.find_one(query, {"_id": 0, "created_at": 1})
-        created_at = doc['created_at']
-        tweet_dates.append(created_at)
+    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
 
     for tweet_date in tweet_dates:
         created_at = datetime.strptime(tweet_date, "%a %b %d %H:%M:%S %z %Y")
@@ -714,12 +712,7 @@ def ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
 
     periods = Counter()
 
-    tweet_dates = []
-    for tweet_id in tweet_ids:
-        query = {'_id': tweet_id}
-        doc = tweet_collection.find_one(query, {"_id": 0, "created_at": 1})
-        created_at = doc['created_at']
-        tweet_dates.append(created_at)
+    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
 
     for tweet_date in tweet_dates:
         created_at = datetime.strptime(tweet_date, "%a %b %d %H:%M:%S %z %Y")
@@ -750,12 +743,7 @@ def ratio_of_retweet_per_time_period(user_id, node_collection,
 
     periods = Counter()
 
-    tweet_dates = []
-    for tweet_id in tweet_ids:
-        query = {'_id': tweet_id}
-        doc = tweet_collection.find_one(query, {"_id": 0, "created_at": 1})
-        created_at = doc['created_at']
-        tweet_dates.append(created_at)
+    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
 
     for tweet_date in tweet_dates:
         created_at = datetime.strptime(tweet_date, "%a %b %d %H:%M:%S %z %Y")

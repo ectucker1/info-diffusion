@@ -277,8 +277,11 @@ def main(network_filepath, keywords_filepath):
         # TODO: look for a way to make this computationally effecient since
         # we can now query a database and just change a particular part of the
         # database.
-        logger.info('building extra features')
-        for user_id in nx.nodes(social_network):
+        logger.info('computing mentioned in')
+        bar = progressbar.ProgressBar(maxlen=n_user_ids,
+                                      prefix=f"Computing {user_id}'s "
+                                      "Attributes: ")
+        for user_id in bar(user_ids):
             query = {"user.id_str": user_id}
             user_tweets = col.find(query)
 
@@ -314,8 +317,8 @@ def main(network_filepath, keywords_filepath):
         with open(key_saveas, 'a') as f:
             f.write('\n***\n\nmake_dataset.py '
                     f'started at {current_date_and_time}')
-            f.write(f'Network path: {network_filepath}')
-            f.write(f'Topic: {filename}')
+            f.write(f'\nNetwork path: {network_filepath}')
+            f.write(f'\nTopic: {filename}')
             f.write(f'\nKey: {key}\n\n')
 
         nx.write_adjlist(social_network,
