@@ -39,7 +39,7 @@ def main(network_filepath, keywords_filepath):
     url = "http://example.com/"
     timeout = 5
 
-    db_name = "info_diffusion"
+    db_name = "info-diffusion"
 
     try:
         # test internet conncetivity is active

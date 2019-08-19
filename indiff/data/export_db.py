@@ -7,6 +7,7 @@ import click
 import progressbar
 import pymongo
 from dotenv import find_dotenv, load_dotenv
+from pymongo.errors import DuplicateKeyError
 from sqlitedict import SqliteDict
 
 
@@ -21,55 +22,29 @@ def main(topic):
     # root directories
     root_dir = Path(__file__).resolve().parents[2]
     datastore_root_dir = os.path.join(root_dir, 'data', 'raw')
-    filename = topic
-    dataset_dir = os.path.join(datastore_root_dir, filename)
+    dataset_dir = os.path.join(datastore_root_dir, topic)
 
     try:
         if not os.path.exists(dataset_dir):
-            raise FileExistsError(f'Dataset for {filename} does not exists.')
-
-        myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-
+            raise FileNotFoundError(f'{dataset_dir} does not exist.')
+        myclient = pymongo.MongoClient("localhost", 27017)
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logger.error(error)
     else:
-        dataset_filepath = Path(dataset_dir)
-        parts = list(dataset_filepath.parts)
-        parts[6] = 'reports'
-        parts.pop(7)
-        reports_filepath = Path(*parts)
-        if not os.path.exists(reports_filepath):
-            os.makedirs(reports_filepath)
-
-        logger.info("Building Features")
         network_filepath = Path(dataset_dir)
         if not network_filepath.is_absolute():
             raise ValueError('Expected an absolute path.')
         if not network_filepath.is_dir():
             raise ValueError('network_filepath path is not a directory.')
 
-        parts = list(network_filepath.parts)
-        parts[7] = 'processed'
-        processed_path = Path(*parts)
-        if not os.path.exists(processed_path):
-            os.makedirs(processed_path)
-
         database_filepath = list(network_filepath.glob('*.sqlite'))[0]
-        # social_network_filepath = list(network_filepath.glob('*.adjlist'))[0]
 
-        # infer path to write corresponding reports
-        # change 'data' to 'reports'
-        # reomve 'raw' from original path
-        parts = list(network_filepath.parts)
-        parts[6] = 'reports'
-        parts.pop(7)
-        reports_filepath = Path(*parts)
-
-        mydb = myclient["infodiffusion"]
+        mydb = myclient["info-diffusion"]
         mycol = mydb[topic]
 
         # get tweet ids that fulfil the date range of interest
-        with SqliteDict(filename=database_filepath.as_posix(),
+        logger.info("Export tweets from sqlite to mongodb")
+        with SqliteDict(topic=database_filepath.as_posix(),
                         tablename='tweet-objects') as tweets:
             # iterate over the tweets dataset to fetch desired result for nodes
             bar = progressbar.ProgressBar(maxval=len(tweets),
@@ -77,7 +52,14 @@ def main(topic):
             for tweet_id in bar(tweets):
                 # export to mongodb
                 tweet_ = tweets[tweet_id]._json
-                _ = mycol.insert_one(tweet_)
+                id_ = {"_id": tweet_id}
+                new_document = {**id_, **tweet_}
+
+                try:
+                    _ = mycol.insert_one(new_document)
+                except DuplicateKeyError:
+                    logging.info(f"found duplicate key: {tweet_id}")
+                    continue
 
 
 if __name__ == '__main__':
