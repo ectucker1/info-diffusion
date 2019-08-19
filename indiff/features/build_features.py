@@ -1,8 +1,5 @@
-from collections import ChainMap, Counter
-from datetime import datetime
+from collections import ChainMap
 
-import numpy as np
-import pandas as pd
 import progressbar
 
 
@@ -115,36 +112,10 @@ def get_hK(user_id, keywords, node_collection):
         return 0
 
 
-def get_A(user_id, node_collection, tweet_collection, hour=None):
-
-    tweet_freq_table = {}
-
-    tweet_ids = get_user_published_tweets(user_id, node_collection)
-
-    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
-
-    N = len(tweet_ids)
-
-    if tweet_dates:
-        for tweet_date in tweet_dates:
-            tweet_date_and_time = datetime.strptime(tweet_date,
-                                                    "%a %b %d %H:%M:%S %z %Y")
-            tweet_date = tweet_date_and_time.date
-            tweet_hour = tweet_date_and_time.hour
-            hour_bin = tweet_hour // 4
-
-            tweet_freq_table.setdefault(
-                tweet_date, {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-            )[hour_bin] += 1
-
-        results = pd.DataFrame(list(tweet_freq_table.values()))
-        results = results / N
-        results = results.values
-        sum_ = np.sum(results, axis=0)
-        # return sum_[hour // 4]
-        return sum_
-    else:
-        return 0
+def get_A(user_id, node_collection, hour=None):
+    query = {'_id': user_id}
+    attr = node_collection.find_one(query)
+    return attr['A']
 
 
 def get_y(src, dest, node_collection):
@@ -182,18 +153,18 @@ def generate_default_attr(src_user, dest_user, keywords, node_collection,
         'dest_mR': get_mR(dest_user, node_collection),
         'src_hK': get_hK(src_user, keywords, node_collection),
         'dest_hK': get_hK(dest_user, keywords, node_collection),
-        'src_A_1': get_A(src_user, node_collection, tweet_collection)[0],
-        'dest_A_1': get_A(dest_user, node_collection, tweet_collection)[0],
-        'src_A_2': get_A(src_user, node_collection, tweet_collection)[1],
-        'dest_A_2': get_A(dest_user, node_collection, tweet_collection)[1],
-        'src_A_3': get_A(src_user, node_collection, tweet_collection)[2],
-        'dest_A_3': get_A(dest_user, node_collection, tweet_collection)[2],
-        'src_A_4': get_A(src_user, node_collection, tweet_collection)[3],
-        'dest_A_4': get_A(dest_user, node_collection, tweet_collection)[3],
-        'src_A_5': get_A(src_user, node_collection, tweet_collection)[4],
-        'dest_A_5': get_A(dest_user, node_collection, tweet_collection)[4],
-        'src_A_6': get_A(src_user, node_collection, tweet_collection)[5],
-        'dest_A_6': get_A(dest_user, node_collection, tweet_collection)[5],
+        'src_A_1': get_A(src_user, node_collection)[0],
+        'dest_A_1': get_A(dest_user, node_collection)[0],
+        'src_A_2': get_A(src_user, node_collection)[1],
+        'dest_A_2': get_A(dest_user, node_collection)[1],
+        'src_A_3': get_A(src_user, node_collection)[2],
+        'dest_A_3': get_A(dest_user, node_collection)[2],
+        'src_A_4': get_A(src_user, node_collection)[3],
+        'dest_A_4': get_A(dest_user, node_collection)[3],
+        'src_A_5': get_A(src_user, node_collection)[4],
+        'dest_A_5': get_A(dest_user, node_collection)[4],
+        'src_A_6': get_A(src_user, node_collection)[5],
+        'dest_A_6': get_A(dest_user, node_collection)[5],
         'y': get_y(src_user, dest_user, node_collection)
     }
 
@@ -233,49 +204,33 @@ def generate_additional_attr(user_id, keywords, node_collection,
         f'{user}_avg_negative_sentiment_of_tweets':
         avg_negative_sentiment_of_tweets(user_id, node_collection),
         f'{user}_ratio_of_tweet_per_time_period_1':
-        ratio_of_tweet_per_time_period(user_id, node_collection,
-                                       tweet_collection)[1],
+        ratio_of_tweet_per_time_period(user_id, node_collection)[1],
         f'{user}_ratio_of_tweet_per_time_period_2':
-        ratio_of_tweet_per_time_period(user_id, node_collection,
-                                       tweet_collection)[2],
+        ratio_of_tweet_per_time_period(user_id, node_collection)[2],
         f'{user}_ratio_of_tweet_per_time_period_3':
-        ratio_of_tweet_per_time_period(user_id, node_collection,
-                                       tweet_collection)[3],
+        ratio_of_tweet_per_time_period(user_id, node_collection)[3],
         f'{user}_ratio_of_tweet_per_time_period_4':
-        ratio_of_tweet_per_time_period(user_id, node_collection,
-                                       tweet_collection)[4],
+        ratio_of_tweet_per_time_period(user_id, node_collection)[4],
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_1':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection,
-                                                           tweet_collection
-                                                           )[1],
+                                                           node_collection)[1],
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_2':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection,
-                                                           tweet_collection
-                                                           )[2],
+                                                           node_collection)[2],
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_3':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection,
-                                                           tweet_collection
-                                                           )[3],
+                                                           node_collection)[3],
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_4':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection,
-                                                           tweet_collection
-                                                           )[4],
+                                                           node_collection)[4],
         f'{user}_ratio_of_retweet_per_time_period_1':
-        ratio_of_retweet_per_time_period(user_id, node_collection,
-                                         tweet_collection)[1],
+        ratio_of_retweet_per_time_period(user_id, node_collection)[1],
         f'{user}_ratio_of_retweet_per_time_period_2':
-        ratio_of_retweet_per_time_period(user_id, node_collection,
-                                         tweet_collection)[2],
+        ratio_of_retweet_per_time_period(user_id, node_collection)[2],
         f'{user}_ratio_of_retweet_per_time_period_3':
-        ratio_of_retweet_per_time_period(user_id, node_collection,
-                                         tweet_collection)[3],
+        ratio_of_retweet_per_time_period(user_id, node_collection)[3],
         f'{user}_ratio_of_retweet_per_time_period_4':
-        ratio_of_retweet_per_time_period(user_id, node_collection,
-                                         tweet_collection)[4],
+        ratio_of_retweet_per_time_period(user_id, node_collection)[4],
         f'{user}_avg_number_followers':
         avg_number_followers(user_id, node_collection),
         f'{user}_avg_number_friends':
@@ -645,15 +600,7 @@ def avg_negative_sentiment_of_tweets(user_id, node_collection):
     return number_of_negative_sentiments / total_number_of_tweets
 
 
-def get_tweet_dates_from_collection(tweet_ids, tweet_collection):
-    for tweet_id in tweet_ids:
-        query = {'_id': tweet_id}
-        doc = tweet_collection.find_one(query, {"_id": 0, "created_at": 1})
-        created_at = doc['created_at']
-        yield(created_at)
-
-
-def ratio_of_tweet_per_time_period(user_id, node_collection, tweet_collection):
+def ratio_of_tweet_per_time_period(user_id, node_collection):
     """ separate tweets in 4 periods using the hour attribute
 
         number 25 (new)
@@ -661,31 +608,13 @@ def ratio_of_tweet_per_time_period(user_id, node_collection, tweet_collection):
         user_id {[type]} -- [description]
         node_collection {[type]} -- [description]
     """
-
-    tweet_ids = get_user_published_tweets(user_id, node_collection)
-    total_number_of_tweets = len(tweet_ids)
-
-    periods = Counter()
-
-    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
-
-    for tweet_date in tweet_dates:
-        created_at = datetime.strptime(tweet_date, "%a %b %d %H:%M:%S %z %Y")
-        h = created_at.hour
-
-        if h in range(0, 24):
-            period = h // 6 + 1
-            periods[period] += 1
-
-    for key, value in periods.items():
-        periods[key] = value / total_number_of_tweets
-
-    return periods
+    query = {'_id': user_id}
+    attr = node_collection.find_one(query)
+    return attr['ratio_of_tweet_per_time_period']
 
 
 def ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                       node_collection,
-                                                       tweet_collection):
+                                                       node_collection):
     """ separate tweets in 4 periods using the hour attribute
 
         number 26 (new)
@@ -693,31 +622,12 @@ def ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
         user_id {[type]} -- [description]
         node_collection {[type]} -- [description]
     """
-
-    tweet_ids = retweeted_tweets(user_id, node_collection)
-    total_number_of_tweets = len(get_user_published_tweets(user_id,
-                                                           node_collection))
-
-    periods = Counter()
-
-    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
-
-    for tweet_date in tweet_dates:
-        created_at = datetime.strptime(tweet_date, "%a %b %d %H:%M:%S %z %Y")
-        h = created_at.hour
-
-        if h in range(0, 24):
-            period = h // 6 + 1
-            periods[period] += 1
-
-    for key, value in periods.items():
-        periods[key] = value / total_number_of_tweets
-
-    return periods
+    query = {'_id': user_id}
+    attr = node_collection.find_one(query)
+    return attr['ratio_of_tweets_that_got_retweeted_per_time_period']
 
 
-def ratio_of_retweet_per_time_period(user_id, node_collection,
-                                     tweet_collection):
+def ratio_of_retweet_per_time_period(user_id, node_collection):
     """ separate tweets in 4 periods using the hour attribute
 
         number 27 (new)
@@ -725,26 +635,6 @@ def ratio_of_retweet_per_time_period(user_id, node_collection,
         user_id {[type]} -- [description]
         node_collection {[type]} -- [description]
     """
-
-    tweet_ids = retweeted_tweets(user_id, node_collection)
-    total_number_of_tweets = len(tweet_ids)
-
-    periods = Counter()
-
-    tweet_dates = get_tweet_dates_from_collection(tweet_ids, tweet_collection)
-
-    for tweet_date in tweet_dates:
-        created_at = datetime.strptime(tweet_date, "%a %b %d %H:%M:%S %z %Y")
-        h = created_at.hour
-
-        if h in range(0, 24):
-            period = h // 6 + 1
-            periods[period] += 1
-
-    for key, value in periods.items():
-        if total_number_of_tweets:
-            periods[key] = value / total_number_of_tweets
-        else:
-            periods[key] = 0
-
-    return periods
+    query = {'_id': user_id}
+    attr = node_collection.find_one(query)
+    return attr['ratio_of_retweet_per_time_period']

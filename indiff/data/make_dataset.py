@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-import datetime
 import logging
 import os
+from collections import Counter
+from datetime import datetime
 from itertools import count
 from pathlib import Path
 
 import click
 import networkx as nx
+import numpy as np
 import pandas as pd
 import progressbar
 import pymongo
@@ -26,7 +28,7 @@ def main(network_filepath, keywords_filepath):
         cleaned data ready to be analyzed (saved in ../processed).
     """
     logger = logging.getLogger(__name__)
-    current_date_and_time = datetime.datetime.now()
+    current_date_and_time = datetime.now()
 
     topic, _ = os.path.splitext(os.path.basename(network_filepath))
 
@@ -147,6 +149,13 @@ def main(network_filepath, keywords_filepath):
                     'tweet_min_date': 0,
                     'tweet_max_date': 0,
                     'n_tweets_with_user_mentions': 0,
+                    'tweet_dates': [],
+                    'retweeted_tweets_dates': [],
+                    'quoted_tweets_dates': [],
+                    'ratio_of_tweet_per_time_period': None,
+                    'ratio_of_tweets_that_got_retweeted_per_time_period': None,
+                    'ratio_of_retweet_per_time_period': None,
+                    'A': None
                     }
 
             query = {"user.id_str": user_id}
@@ -184,6 +193,9 @@ def main(network_filepath, keywords_filepath):
 
                     if tweet.is_others_mentioned:
                         user['retweets_with_others_mentioned_count'] += 1
+
+                    # fetch tweet dates
+                    user['retweeted_tweets_dates'].append(tweet.created_at)
                 elif tweet.is_quoted_tweet:
                     user['quoted_tweets'].append(tweet.id)
 
@@ -196,6 +208,9 @@ def main(network_filepath, keywords_filepath):
 
                     if tweet.is_others_mentioned:
                         user['quoted_tweets_with_others_mentioned_count'] += 1
+
+                    # fetch tweet dates
+                    user['quoted_tweet_dates'].append(tweet.created_at)
                 else:
                     user['tweets'].append(tweet.id)
 
@@ -212,6 +227,9 @@ def main(network_filepath, keywords_filepath):
 
                     if tweet.is_others_mentioned:
                         user['tweets_with_others_mentioned_count'] += 1
+
+                    # fetch tweet dates
+                    user['tweet_dates'].append(tweet.created_at)
 
                 if tweet.is_favourited:
                     user['favorite_tweets_count'] += 1
@@ -249,6 +267,91 @@ def main(network_filepath, keywords_filepath):
                 # calculate n_tweets_with_user_mentions
                 if tweet.users_mentioned:
                     user['n_tweets_with_user_mentions'] += 1
+
+            # compute ratio_of_tweet_per_time_period
+            periods = Counter()
+
+            all_tweets_dates = user['tweets_dates']
+            + user['retweeted_tweets_dates']
+            + user['quoted_tweets_dates']
+
+            n_all_tweets_dates = len(all_tweets_dates)
+
+            for tweet_date in all_tweets_dates:
+                created_at = datetime.strptime(tweet_date,
+                                               "%a %b %d %H:%M:%S %z %Y")
+                h = created_at.hour
+
+                if h in range(0, 24):
+                    period = h // 6 + 1
+                    periods[period] += 1
+
+            for key, value in periods.items():
+                periods[key] = value / n_all_tweets_dates
+
+            user['ratio_of_tweet_per_time_period'] = periods
+
+            # compute ratio_of_tweets_that_got_retweeted_per_time_period
+            periods = Counter()
+
+            retweeted_tweets_dates = user['retweeted_tweets_dates']
+            n_retweeted_tweets_dates = len(retweeted_tweets_dates)
+
+            for tweet_date in retweeted_tweets_dates:
+                created_at = datetime.strptime(tweet_date,
+                                               "%a %b %d %H:%M:%S %z %Y")
+                h = created_at.hour
+
+                if h in range(0, 24):
+                    period = h // 6 + 1
+                    periods[period] += 1
+
+            for key, value in periods.items():
+                periods[key] = value / n_all_tweets_dates
+
+            user['ratio_of_tweets_that_got_retweeted_per_time_period'] = periods
+
+            # compute ratio_of_retweet_per_time_period
+            periods = Counter()
+
+            for tweet_date in retweeted_tweets_dates:
+                created_at = datetime.strptime(tweet_date,
+                                               "%a %b %d %H:%M:%S %z %Y")
+
+                h = created_at.hour
+
+                if h in range(0, 24):
+                    period = h // 6 + 1
+                    periods[period] += 1
+
+            for key, value in periods.items():
+                if n_retweeted_tweets_dates:
+                    periods[key] = value / n_retweeted_tweets_dates
+                else:
+                    periods[key] = 0
+
+            user['ratio_of_retweet_per_time_period'] = periods
+
+            # compute get_A
+            tweet_freq_table = {}
+
+            for tweet_date in all_tweets_dates:
+                tweet_date_and_time = datetime.strptime(tweet_date,
+                                                        "%a %b %d %H:%M:%S %z %Y")
+                tweet_date = tweet_date_and_time.date
+                tweet_hour = tweet_date_and_time.hour
+                hour_bin = tweet_hour // 4
+
+                tweet_freq_table.setdefault(
+                    tweet_date, {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+                )[hour_bin] += 1
+
+            results = pd.DataFrame(list(tweet_freq_table.values()))
+            results = results / all_tweets_dates
+            results = results.values
+            sum_ = np.sum(results, axis=0)
+
+            user['A'] = sum_
 
             # write node attributes as document to database
             id_ = {"_id": user_id}
