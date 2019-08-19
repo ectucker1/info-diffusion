@@ -28,11 +28,13 @@ def main(network_filepath, keywords_filepath):
     logger = logging.getLogger(__name__)
     current_date_and_time = datetime.datetime.now()
 
+    topic, _ = os.path.splitext(os.path.basename(network_filepath))
+
     # root directories
     root_dir = Path(__file__).resolve().parents[2]
-    datastore_root_dir = os.path.join(root_dir, 'data', 'raw')
-    filename, _ = os.path.splitext(os.path.basename(network_filepath))
-    dataset_dir = os.path.join(datastore_root_dir, filename)
+    data_root_dir = os.path.join(root_dir, 'data')
+    raw_data_root_dir = os.path.join(data_root_dir, 'raw')
+    topic_raw_data_dir = os.path.join(raw_data_root_dir, topic)
 
     url = "http://example.com/"
     timeout = 5
@@ -40,8 +42,8 @@ def main(network_filepath, keywords_filepath):
     db_name = "info_diffusion"
 
     try:
-        if os.path.exists(dataset_dir):
-            raise FileExistsError(f'Dataset for {filename} already exists.')
+        if os.path.exists(topic_raw_data_dir):
+            raise FileExistsError(f'Dataset for {topic} already exists.')
 
         # test internet conncetivity is active
         req = requests.get(url, timeout=timeout)
@@ -62,8 +64,8 @@ def main(network_filepath, keywords_filepath):
 
         myclient = pymongo.MongoClient('localhost', 27017)
         db = myclient[db_name]
-        col = db[filename]
-        node_collection = db[filename + "-nodes"]
+        col = db[topic]
+        node_collection = db[topic + "-nodes"]
 
         # build initial graph from file
         social_network = nx.read_edgelist(network_filepath, delimiter=',',
@@ -77,8 +79,8 @@ def main(network_filepath, keywords_filepath):
         logger.error("No internet connection available.")
     else:
 
-        if not os.path.exists(dataset_dir):
-            os.makedirs(dataset_dir)
+        if not os.path.exists(topic_raw_data_dir):
+            os.makedirs(topic_raw_data_dir)
 
         nodes = social_network.nodes()
 
@@ -94,36 +96,23 @@ def main(network_filepath, keywords_filepath):
         # free memory holding error ids
         del error_ids
 
-        social_network.name = filename
+        social_network.name = topic
 
-        dataset_filepath = Path(dataset_dir)
-        parts = list(dataset_filepath.parts)
-        parts[6] = 'reports'
-        parts.pop(7)
-        reports_filepath = Path(*parts)
-        if not os.path.exists(reports_filepath):
-            os.makedirs(reports_filepath)
+        topic_raw_data_dir = Path(topic_raw_data_dir)
 
-        logger.info("Building Features")
-        network_filepath = Path(dataset_dir)
-        if not network_filepath.is_absolute():
-            raise ValueError('Expected an absolute path.')
-        if not network_filepath.is_dir():
-            raise ValueError('network_filepath path is not a directory.')
+        # processed file path
+        parts = list(topic_raw_data_dir.parts)
+        _ = parts.pop()
+        parts[-1] = 'processed'
+        processed_root_dir = Path(*parts)
 
-        parts = list(network_filepath.parts)
-        parts[7] = 'processed'
-        processed_path = Path(*parts)
-        if not os.path.exists(processed_path):
-            os.makedirs(processed_path)
-
-        # infer path to write corresponding reports
-        # change 'data' to 'reports'
-        # reomve 'raw' from original path
-        parts = list(network_filepath.parts)
-        parts[6] = 'reports'
-        parts.pop(7)
-        reports_filepath = Path(*parts)
+        # reports file path
+        parts = list(topic_raw_data_dir.parts)
+        if parts[-2] != 'raw':
+            raise ValueError(f'Not an expected file path. Expected value: raw')
+        _ = parts.pop(-2)
+        parts[-2] = 'reports'
+        topic_report_dir = Path(*parts)
 
         # initialise node attributes to have desired info from dataset
         user_ids = nx.nodes(social_network)
@@ -309,26 +298,30 @@ def main(network_filepath, keywords_filepath):
 
         # save processed dataset to hdf file
         key = utils.generate_random_id(15)
-        processed_saveas = os.path.join(processed_path, 'dataset.h5')
+        if not os.path.exists(processed_root_dir):
+            os.makedirs(processed_root_dir)
+        processed_saveas = os.path.join(processed_root_dir, 'dataset.h5')
         df.to_hdf(processed_saveas, key=key)
 
         # save key to reports directory
-        key_saveas = os.path.join(reports_filepath, 'dataset.keys')
+        if not os.path.exists(topic_report_dir):
+            os.makedirs(topic_report_dir)
+        key_saveas = os.path.join(topic_report_dir, 'dataset.keys')
         with open(key_saveas, 'a') as f:
             f.write('\n***\n\nmake_dataset.py '
                     f'started at {current_date_and_time}')
             f.write(f'\nNetwork path: {network_filepath}')
-            f.write(f'\nTopic: {filename}')
+            f.write(f'\nTopic: {topic}')
             f.write(f'\nKey: {key}\n\n')
 
         nx.write_adjlist(social_network,
-                         os.path.join(dataset_dir, f'{filename}.adjlist'),
+                         os.path.join(topic_raw_data_dir, f'{topic}.adjlist'),
                          delimiter=',')
 
-        graph_info_saveas = os.path.join(reports_filepath,
-                                         f'{filename}-crawl-stats.txt')
+        graph_info_saveas = os.path.join(topic_report_dir,
+                                         f'{topic}-crawl-stats.txt')
         with open(graph_info_saveas, 'w') as f:
-            f.write(f'###* Info for {filename}, started at '
+            f.write(f'###* Info for {topic}, started at '
                     f'{current_date_and_time}.\n#\n#\n')
             f.write(nx.info(social_network))
             f.write(f'\nNumber of tweets: {tweet_count}')
