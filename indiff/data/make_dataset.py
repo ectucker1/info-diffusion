@@ -42,9 +42,6 @@ def main(network_filepath, keywords_filepath):
     db_name = "info_diffusion"
 
     try:
-        if os.path.exists(topic_raw_data_dir):
-            raise FileExistsError(f'Dataset for {topic} already exists.')
-
         # test internet conncetivity is active
         req = requests.get(url, timeout=timeout)
         req.raise_for_status()
@@ -112,7 +109,7 @@ def main(network_filepath, keywords_filepath):
             raise ValueError(f'Not an expected file path. Expected value: raw')
         _ = parts.pop(-2)
         parts[-2] = 'reports'
-        topic_report_dir = Path(*parts)
+        topic_reports_dir = Path(*parts)
 
         # initialise node attributes to have desired info from dataset
         user_ids = nx.nodes(social_network)
@@ -304,9 +301,9 @@ def main(network_filepath, keywords_filepath):
         df.to_hdf(processed_saveas, key=key)
 
         # save key to reports directory
-        if not os.path.exists(topic_report_dir):
-            os.makedirs(topic_report_dir)
-        key_saveas = os.path.join(topic_report_dir, 'dataset.keys')
+        if not os.path.exists(topic_reports_dir):
+            os.makedirs(topic_reports_dir)
+        key_saveas = os.path.join(topic_reports_dir.parent, 'dataset.keys')
         with open(key_saveas, 'a') as f:
             f.write('\n***\n\nmake_dataset.py '
                     f'started at {current_date_and_time}')
@@ -318,7 +315,7 @@ def main(network_filepath, keywords_filepath):
                          os.path.join(topic_raw_data_dir, f'{topic}.adjlist'),
                          delimiter=',')
 
-        graph_info_saveas = os.path.join(topic_report_dir,
+        graph_info_saveas = os.path.join(topic_reports_dir,
                                          f'{topic}-crawl-stats.txt')
         with open(graph_info_saveas, 'w') as f:
             f.write(f'###* Info for {topic}, started at '
