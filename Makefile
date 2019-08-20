@@ -26,9 +26,13 @@ ifneq (conda, $(VIRTUALENV))
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 endif
 
-## Make Dataset
+## Download Tweet into mongodb
 data: test_environment test_server
-	$(PYTHON_INTERPRETER) -m indiff.data.make_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
+	$(PYTHON_INTERPRETER) -m indiff.data.download_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
+
+## Building Features
+features: test_environment test_server
+	$(PYTHON_INTERPRETER) -m indiff.data.make_features $(TOPIC) $(KEYWORDS_FILE)
 
 ## Restart at Building Features
 rebuild_features: test_environment test_server

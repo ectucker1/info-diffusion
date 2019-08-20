@@ -56,16 +56,16 @@ def get_h(src_user, dest_user, node_collection):
 def number_of_tweets_with_user_mentions(user_id, node_collection):
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
-    return set(attr['n_tweets_with_user_mentions'])
+    return attr['n_tweets_with_user_mentions']
 
 
 def get_dTR(user_id, node_collection):
     # change dv..... mv is okay
     n_dv = number_of_tweets_with_user_mentions(user_id, node_collection)
-    mv = get_user_published_tweets(user_id, node_collection)
+    n_mv = len(get_user_published_tweets(user_id, node_collection))
 
-    if len(mv) > 0:
-        return n_dv / len(mv)
+    if n_mv > 0:
+        return n_dv / n_mv
     else:
         return 0
 
@@ -87,10 +87,10 @@ def tweets_mentioned_in(user_id, node_collection):
 
 
 def get_mR(user_id, node_collection, meu=200):
-    tmv = tweets_mentioned_in(user_id, node_collection)
+    n_tmv = len(tweets_mentioned_in(user_id, node_collection))
 
-    if len(tmv) < meu:
-        return len(tmv) / meu
+    if n_tmv < meu:
+        return n_tmv / meu
     else:
         return 1
 
@@ -204,33 +204,65 @@ def generate_additional_attr(user_id, keywords, node_collection,
         f'{user}_avg_negative_sentiment_of_tweets':
         avg_negative_sentiment_of_tweets(user_id, node_collection),
         f'{user}_ratio_of_tweet_per_time_period_1':
-        ratio_of_tweet_per_time_period(user_id, node_collection)[1],
+        ratio_of_tweet_per_time_period(user_id, node_collection)['1']
+            if '1' in ratio_of_tweet_per_time_period(user_id,
+                                                     node_collection) else 0,
         f'{user}_ratio_of_tweet_per_time_period_2':
-        ratio_of_tweet_per_time_period(user_id, node_collection)[2],
+        ratio_of_tweet_per_time_period(user_id, node_collection)['2']
+        if '2' in ratio_of_tweet_per_time_period(user_id,
+                                                 node_collection) else 0,
         f'{user}_ratio_of_tweet_per_time_period_3':
-        ratio_of_tweet_per_time_period(user_id, node_collection)[3],
+        ratio_of_tweet_per_time_period(user_id, node_collection)['3']
+        if '3' in ratio_of_tweet_per_time_period(user_id,
+                                                 node_collection) else 0,
         f'{user}_ratio_of_tweet_per_time_period_4':
-        ratio_of_tweet_per_time_period(user_id, node_collection)[4],
+        ratio_of_tweet_per_time_period(user_id, node_collection)['4']
+        if '4' in ratio_of_tweet_per_time_period(user_id,
+                                                 node_collection) else 0,
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_1':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection)[1],
+                                                           node_collection
+                                                           )['1']
+        if '1' in ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
+                                                                     node_collection)
+        else 0,
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_2':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection)[2],
+                                                           node_collection
+                                                           )['2']
+        if '2' in ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
+                                                                     node_collection)
+        else 0,
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_3':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection)[3],
+                                                           node_collection
+                                                           )['3']
+        if '3' in ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
+                                                                     node_collection)
+        else 0,
         f'{user}_ratio_of_tweets_that_got_retweeted_per_time_period_4':
         ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
-                                                           node_collection)[4],
+                                                           node_collection
+                                                           )['4']
+        if '4' in ratio_of_tweets_that_got_retweeted_per_time_period(user_id,
+                                                                     node_collection)
+        else 0,
         f'{user}_ratio_of_retweet_per_time_period_1':
-        ratio_of_retweet_per_time_period(user_id, node_collection)[1],
+        ratio_of_retweet_per_time_period(user_id, node_collection)['1']
+        if '1' in ratio_of_retweet_per_time_period(user_id, node_collection)
+        else 0,
         f'{user}_ratio_of_retweet_per_time_period_2':
-        ratio_of_retweet_per_time_period(user_id, node_collection)[2],
+        ratio_of_retweet_per_time_period(user_id, node_collection)['2']
+        if '2' in ratio_of_retweet_per_time_period(user_id, node_collection)
+        else 0,
         f'{user}_ratio_of_retweet_per_time_period_3':
-        ratio_of_retweet_per_time_period(user_id, node_collection)[3],
+        ratio_of_retweet_per_time_period(user_id, node_collection)['3']
+        if '3' in ratio_of_retweet_per_time_period(user_id, node_collection)
+        else 0,
         f'{user}_ratio_of_retweet_per_time_period_4':
-        ratio_of_retweet_per_time_period(user_id, node_collection)[4],
+        ratio_of_retweet_per_time_period(user_id, node_collection)['4']
+        if '4' in ratio_of_retweet_per_time_period(user_id, node_collection)
+        else 0,
         f'{user}_avg_number_followers':
         avg_number_followers(user_id, node_collection),
         f'{user}_avg_number_friends':
@@ -269,11 +301,11 @@ def calculate_network_diffusion(edges, keywords, node_collection,
             yield (def_result)
 
 
-def retweeted_tweets(user_id, node_collection):
+def number_of_retweeted_tweets(user_id, node_collection):
     """---"""
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
-    return attr['retweeted_tweets']
+    return len(attr['retweeted_tweets'])
 
 
 def retweet_count(user_id, node_collection):
@@ -291,7 +323,7 @@ def ratio_of_retweets_to_tweets(user_id, node_collection):
     total_number_of_tweets = len(get_user_published_tweets(user_id,
                                                            node_collection))
 
-    # todo: might need to check for divisible by zero
+    # TODO: might need to check for divisible by zero
     return total_number_of_tweets_retweeted / total_number_of_tweets
 
 
@@ -308,7 +340,7 @@ def avg_number_of_tweets_with_hastags(user_id, node_collection):
     total_number_of_tweets = len(get_user_published_tweets(user_id,
                                                            node_collection))
 
-    # todo: might need to check for divisible by zero
+    # TODO: might need to check for divisible by zero
     return n_tweets_with_hashtags / total_number_of_tweets
 
 
@@ -321,7 +353,7 @@ def retweets_with_hashtags(user_id, node_collection):
 def avg_number_of_retweets_with_hastags(user_id, node_collection):
     """ notation 8 (i) (new) """
     n_retweets_with_hashtags = retweets_with_hashtags(user_id, node_collection)
-    n_retweeted_tweets = len(retweeted_tweets(user_id, node_collection))
+    n_retweeted_tweets = number_of_retweeted_tweets(user_id, node_collection)
 
     # todo: might need to check for divisible by zero
     if n_retweeted_tweets:
@@ -332,11 +364,11 @@ def avg_number_of_retweets_with_hastags(user_id, node_collection):
 
 def avg_number_of_retweets(user_id, node_collection):
     """ number 9 (new) """
-    n_retweeted_tweets = len(retweeted_tweets(user_id, node_collection))
+    n_retweeted_tweets = number_of_retweeted_tweets(user_id, node_collection)
     total_number_of_tweets = len(get_user_published_tweets(user_id,
                                                            node_collection))
 
-    # todo: might need to check for divisible by zero
+    # TODO: might need to check for divisible by zero
     return n_retweeted_tweets / total_number_of_tweets
 
 
@@ -459,7 +491,7 @@ def avg_url_per_retweet(user_id, node_collection):
     """ number 17 (i) new """
     n_retweeted_tweets_with_url = retweeted_tweets_with_urls(user_id,
                                                              node_collection)
-    n_retweeted_tweets = len(retweeted_tweets(user_id, node_collection))
+    n_retweeted_tweets = number_of_retweeted_tweets(user_id, node_collection)
 
     # todo: might need to check for divisible by zero
     if n_retweeted_tweets:
@@ -506,7 +538,7 @@ def avg_number_of_media_in_retweets(user_id, node_collection):
     """ number 18 (i) new """
     n_retweets_with_media = retweeted_tweets_with_media(user_id,
                                                         node_collection)
-    n_retweeted_tweets = len(retweeted_tweets(user_id, node_collection))
+    n_retweeted_tweets = number_of_retweeted_tweets(user_id, node_collection)
 
     # todo: might need to check for divisible by zero
     if n_retweeted_tweets:
