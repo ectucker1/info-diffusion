@@ -28,7 +28,7 @@ endif
 
 ## Download Tweet into mongodb
 data: test_environment test_server
-	$(PYTHON_INTERPRETER) -m indiff.data.download_dataset $(NETWORK_FILE) $(KEYWORDS_FILE)
+	$(PYTHON_INTERPRETER) -m indiff.data.download_dataset $(NETWORK_FILE)
 
 ## Building Features
 features: test_environment test_server
