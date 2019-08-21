@@ -359,17 +359,20 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
 
     logging.info("Fetching {}'s tweets....".format(user))
 
+    tweet_count = 0
+
     bar = progressbar.ProgressBar()
-    for status in bar(tweepy.Cursor(api.user_timeline,
-                                    id=user).items(n_tweets)):
-
+    cursor = tweepy.Cursor(api.user_timeline, id=user).items(n_tweets)
+    for status in bar(cursor):
+        tweet_count += 1
         tweet = status._json
+        id_ = {"_id": tweet['id_str']}
+        new_document = {**id_, **tweet}
+        try:
+            collection.insert_one(new_document)
+        except DuplicateKeyError:
+            logging.info(f"found duplicate key: {tweet['id_str']}")
+            continue
 
-        if tweet:
-            id_ = {"_id": tweet['id_str']}
-            new_document = {**id_, **tweet}
-            try:
-                collection.insert_one(new_document)
-            except DuplicateKeyError:
-                logging.info(f"found duplicate key: {tweet['id_str']}")
-                continue
+    if not tweet_count:
+        raise tweepy.TweepError('User has no tweet.')

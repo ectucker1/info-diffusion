@@ -34,6 +34,7 @@ def main(network_filepath):
     timeout = 5
 
     db_name = "info-diffusion"
+    client = None
 
     try:
         # test internet conncetivity is active
@@ -53,8 +54,9 @@ def main(network_filepath):
 
         api = auth()
 
-        myclient = pymongo.MongoClient('localhost', 27017)
-        db = myclient[db_name]
+        client = pymongo.MongoClient(host='localhost', port=27017,
+                                     appname=__file__)
+        db = client[db_name]
         col = db[topic]
 
         # build initial graph from file
@@ -92,26 +94,31 @@ def main(network_filepath):
         parts[-2] = 'reports'
         topic_reports_dir = Path(*parts)
 
-        nx.write_adjlist(social_network,
-                         os.path.join(topic_raw_data_dir, f'{topic}.adjlist'),
-                         delimiter=',')
+        graph_filename = os.path.join(topic_raw_data_dir, f'{topic}.adjlist')
+        logger.info(f'writing graph to {graph_filename}')
+        nx.write_adjlist(social_network, graph_filename, delimiter=',')
 
         tweet_count = col.count_documents({})
-        graph_info_saveas = os.path.join(topic_reports_dir,
-                                         f'{topic}-crawl-stats.txt')
+        graph_info_filename = os.path.join(topic_reports_dir,
+                                           f'{topic}-crawl-stats.txt')
+        logger.info(f'writing crawl reports to {graph_info_filename}')
 
         if not os.path.exists(topic_reports_dir):
             os.makedirs(topic_reports_dir)
 
         mode = 'a'
-        if not os.path.exists(graph_info_saveas):
+        if not os.path.exists(graph_info_filename):
             mode = 'w'
 
-        with open(graph_info_saveas, mode) as f:
+        with open(graph_info_filename, mode) as f:
             f.write(f'###* Info for {topic}, started at '
                     f'{current_date_and_time}.\n#\n#\n')
             f.write(nx.info(social_network))
             f.write(f'\nNumber of tweets: {tweet_count}')
+    finally:
+        if client is not None:
+            logger.info('ending all server sessions')
+            client.close()
 
 
 if __name__ == '__main__':
