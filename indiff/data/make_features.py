@@ -46,7 +46,7 @@ def main(topic, keywords_filepath):
                                      appname=__file__)
         db = client[db_name]
         tweet_collection = db[topic]
-        user_attribs_collection = db[topic + "-user-attr"]
+        user_attribs_collection = db[topic + "-user-attribs"]
         tweet_mentions_collection = db[topic + "-mentions"]
 
         if db_name not in client.list_database_names():
