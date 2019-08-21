@@ -36,15 +36,18 @@ def main(topic, keywords_filepath):
     topic_raw_data_dir = os.path.join(raw_data_root_dir, topic)
 
     db_name = "info-diffusion"
+    client = None
 
     try:
         if not os.path.exists(topic_raw_data_dir):
             raise FileExistsError(f'Dataset for {topic} does not exists.')
 
-        client = pymongo.MongoClient('localhost', 27017)
+        client = pymongo.MongoClient(host='localhost', port=27017,
+                                     appname=__file__)
         db = client[db_name]
-        col = db[topic]
-        node_collection = db[topic + "-nodes"]
+        tweet_collection = db[topic]
+        user_attribs_collection = db[topic + "-user-attr"]
+        tweet_mentions_collection = db[topic + "-mentions"]
 
         if db_name not in client.list_database_names():
             raise ValueError(f"Database does not exist: {db_name}.")
@@ -78,7 +81,8 @@ def main(topic, keywords_filepath):
         n_user_ids = len(user_ids)
 
         for i, user_id in zip(count(start=1), user_ids):
-            logging.info(f"PROCESSING NODE ATTR FOR {i} OF {n_user_ids} USERS")
+            logging.info(f"PROCESSING NODE ATTR FOR {user_id}: "
+                         f"{i} OF {n_user_ids} USERS")
             user = {'tweets': [],
                     'n_tweets_with_hashtags': 0,
                     'n_tweets_with_urls': 0,
@@ -121,7 +125,7 @@ def main(topic, keywords_filepath):
                     }
 
             query = {"user.id_str": user_id}
-            user_tweets = col.find(query)
+            user_tweets = tweet_collection.find(query)
 
             bar = progressbar.ProgressBar(prefix=f"Computing {user_id}'s "
                                           "Attributes: ")
@@ -187,6 +191,15 @@ def main(topic, keywords_filepath):
                     if users_mentioned_in_tweet:
                         user['users_mentioned_in_all_my_tweets'].extend(
                             users_mentioned_in_tweet)
+
+                        # write tweet-user-mentioned to db
+                        tweet_users_doc = {
+                            "_id": tweet.id,
+                            "users": users_mentioned_in_tweet
+                        }
+
+                        tweet_mentions_collection.insert_one(
+                            tweet_users_doc)
 
                     if tweet.is_others_mentioned:
                         user['tweets_with_others_mentioned_count'] += 1
@@ -312,10 +325,10 @@ def main(topic, keywords_filepath):
             new_document = {**id_, **user}
 
             try:
-                node_collection.insert_one(new_document)
+                user_attribs_collection.insert_one(new_document)
             except pymongo.errors.DuplicateKeyError:
                 logger.info(f'updating node attribute for {user_id}')
-                node_collection.replace_one(id_, new_document)
+                user_attribs_collection.replace_one(id_, new_document)
             except pymongo.errors.InvalidDocument as err:
                 logger.error('found an invalid document')
                 logger.error(err)
@@ -324,29 +337,42 @@ def main(topic, keywords_filepath):
         # TODO: look for a way to make this computationally effecient since
         # we can now query a database and just change a particular part of the
         # database.
-        logger.info('computing mentioned in')
-        bar = progressbar.ProgressBar(maxlen=n_user_ids)
-        for user_id in bar(user_ids):
-            query = {"user.id_str": user_id}
-            user_tweets = col.find(query)
+        # get all tweets in database
+        n_tweets = tweet_mentions_collection.count_documents({})
+        if n_tweets:
+            logger.info('update user attribs with tweets mentioned in')
+            tweets = tweet_mentions_collection.find({})
+            bar = progressbar.ProgressBar(maxlen=n_tweets)
+            for tweet_document in bar(tweets):
+                tweet_id = tweet_document['_id']
+                users_mentioned = tweet_document['users']
 
-            for user_tweet in user_tweets:
-                tweet = Tweet(user_tweet)
-                users_mentioned_in_tweet = tweet.users_mentioned
-                if users_mentioned_in_tweet:
-                    for other_user in users_mentioned_in_tweet:
-                        if other_user in social_network:
-                            query = {'_id': other_user}
-                            attr = node_collection.find_one(query)
-                            attr['mentioned_in'].append(tweet.id)
-                            node_collection.replace_one(query, attr)
+                for user in users_mentioned:
+                    # check if user exists in user_attribs_collection
+                    query_user_attr = {"_id": user}
+                    document_count = user_attribs_collection.count_documents(
+                        query_user_attr)
+                    if document_count:
+                        user_attr_document = user_attribs_collection.find_one(
+                            query_user_attr)
+
+                        # update the document
+                        mentioned_in = user_attr_document['mentioned_in']
+                        mentioned_in.append(tweet_id)
+                        new_values = {"$set": {
+                            "mentioned_in": mentioned_in
+                            }}
+
+                        user_attribs_collection.update_one(
+                            query_user_attr, new_values)
 
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
         # prepare table for dataframe
         results = build_features.calculate_network_diffusion(
             nx.edges(social_network), keywords,
-            node_collection=node_collection, tweet_collection=col,
+            node_collection=user_attribs_collection,
+            tweet_collection=tweet_collection,
             additional_attr=True,
             do_not_add_sentiment=False)
 
@@ -358,12 +384,14 @@ def main(topic, keywords_filepath):
         # save features to a centralised raw directory
         raw_dataset_dir = topic_raw_data_dir.parent
         processed_saveas = os.path.join(raw_dataset_dir, 'dataset.h5')
+        logger.info(f'saving computed features to "{processed_saveas}"')
         df.to_hdf(processed_saveas, key=key)
 
         # save key to reports directory
         if not os.path.exists(topic_reports_dir):
             os.makedirs(topic_reports_dir)
         key_saveas = os.path.join(topic_reports_dir.parent, 'dataset.keys')
+        logger.info(f'saving dataset key to "{key_saveas}"')
 
         mode = 'a'
         if not os.path.exists(key_saveas):
@@ -375,6 +403,10 @@ def main(topic, keywords_filepath):
             f.write(f'\nNetwork path: {topic_raw_data_dir}')
             f.write(f'\nTopic: {topic}')
             f.write(f'\nKey: {key}\n\n')
+    finally:
+        if client is not None:
+            logger.info('ending all server sessions')
+            client.close()
 
 
 if __name__ == '__main__':
