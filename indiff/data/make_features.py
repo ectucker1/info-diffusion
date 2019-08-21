@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-from datetime import datetime
 import logging
 import os
+from collections import Counter
+from datetime import datetime
 from itertools import count
 from pathlib import Path
-from collections import Counter
 
 import click
 import networkx as nx
+import numpy as np
 import pandas as pd
 import progressbar
-import numpy as np
 import pymongo
 from dotenv import find_dotenv, load_dotenv
 
@@ -82,6 +82,7 @@ def main(topic, keywords_filepath):
         # initialise node attributes to have desired info from dataset
         user_ids = nx.nodes(social_network)
         n_user_ids = len(user_ids)
+
         for i, user_id in zip(count(start=1), user_ids):
             logging.info(f"PROCESSING NODE ATTR FOR {i} OF {n_user_ids} USERS")
             user = {'tweets': [],
@@ -325,17 +326,12 @@ def main(topic, keywords_filepath):
                 logger.error('found an invalid document')
                 logger.error(err)
 
-        # free user memory from previous ieration
-        del user
-
         # calculate extra attributes
         # TODO: look for a way to make this computationally effecient since
         # we can now query a database and just change a particular part of the
         # database.
         logger.info('computing mentioned in')
-        bar = progressbar.ProgressBar(maxlen=n_user_ids,
-                                      prefix=f"Computing {user_id}'s "
-                                      "Attributes: ")
+        bar = progressbar.ProgressBar(maxlen=n_user_ids)
         for user_id in bar(user_ids):
             query = {"user.id_str": user_id}
             user_tweets = col.find(query)
@@ -373,7 +369,12 @@ def main(topic, keywords_filepath):
         if not os.path.exists(topic_reports_dir):
             os.makedirs(topic_reports_dir)
         key_saveas = os.path.join(topic_reports_dir.parent, 'dataset.keys')
-        with open(key_saveas, 'a') as f:
+
+        mode = 'a'
+        if not os.path.exists(key_saveas):
+            mode = 'w'
+
+        with open(key_saveas, mode) as f:
             f.write('\n***\n\nmake_dataset.py '
                     f'started at {current_date_and_time}')
             f.write(f'\nNetwork path: {topic_raw_data_dir}')

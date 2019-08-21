@@ -1,120 +1,12 @@
 import datetime
 import logging
-import os
 from itertools import count
-from time import sleep
 
+import progressbar
 import tweepy
 from pymongo.errors import DuplicateKeyError
-from selenium import webdriver
-from selenium.common.exceptions import (NoSuchElementException,
-                                        StaleElementReferenceException)
 
-from .exception import WebBrowserError, WebDriverError
 from .utils import sentiment, split_text
-
-
-def _format_date(date):
-    day = '0' + str(date.day) if len(str(date.day)) == 1 else str(date.day)
-    month = '0' + str(date.month)\
-            if len(str(date.month)) == 1 else str(date.month)
-    year = str(date.year)
-    return '-'.join([year, month, day])
-
-
-def _form_url(since, until, user):
-    search_url = f'https://twitter.com/search?q=from%3A{user}%20%20since%3A'\
-                 f'{since}%20until%3A{until}%20include%3Anativeretweets&src='\
-                 'typed_query'
-    return search_url
-
-
-def _increment_day(date, i):
-    return date + datetime.timedelta(days=i)
-
-
-class Scrape(object):
-    def __init__(self, user):
-        self.user = user
-
-    def tweet_ids(self, start_date=None, end_date=None, delay_time=1,
-                  web_browser='chrome', path_to_driver=None):
-        if start_date is None:
-            start_date = datetime.datetime(2010, 1, 1)
-
-        if end_date is None:
-            end_date = datetime.datetime.now()
-
-        if end_date < start_date:
-            raise ValueError("Incorrect start and end dates.")
-
-        if start_date == end_date:
-            raise ValueError("Date must be at least an earlier date.")
-
-        if web_browser == 'chrome':
-            if path_to_driver is None:
-                path_to_driver = "chromedriver"
-            driver = webdriver.Chrome(executable_path=path_to_driver)
-        elif web_browser == 'safari':
-            if path_to_driver is None:
-                path_to_driver = "/usr/bin/safaridriver"
-            driver = webdriver.Safari(executable_path=path_to_driver)
-        elif web_browser == 'firefox':
-            if path_to_driver is None:
-                path_to_driver = "geckodriver"
-            driver = webdriver.Firefox(executable_path=path_to_driver)
-        else:
-            raise WebBrowserError("Web Browser can only be Safari, "
-                                  "Firefox or Chrome")
-
-        if not os.path.exists(path_to_driver):
-            raise WebDriverError(f'{web_browser} driver not found '
-                                 f'in {path_to_driver}.')
-
-        days = (end_date - start_date).days + 1
-        id_selector = '.time a.tweet-timestamp'
-        tweet_selector = 'li.js-stream-item'
-        user = self.user.lower()
-
-        for _ in range(days):
-            d1 = _format_date(_increment_day(start_date, 0))
-            d2 = _format_date(_increment_day(start_date, 1))
-            url = _form_url(d1, d2, user)
-            print(url)
-            print(d1)
-            driver.get(url)
-            sleep(delay_time)
-
-            try:
-                found_tweets = driver.find_elements_by_css_selector(tweet_selector)
-                increment = 10
-
-                while len(found_tweets) >= increment:
-                    print('scrolling down to load more tweets')
-                    driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
-                    sleep(delay_time)
-                    found_tweets = driver.find_elements_by_css_selector(tweet_selector)
-                    increment += 10
-
-                print('{} tweets found'.format(len(found_tweets)))
-
-                for tweet in found_tweets:
-                    try:
-                        id = tweet.find_element_by_css_selector(id_selector).get_attribute('href').split('/')[-1]
-                        yield (id)
-                    except StaleElementReferenceException:
-                        print('lost element reference', tweet)
-
-            except NoSuchElementException:
-                print('no tweets on this day')
-
-            start_date = _increment_day(start_date, 1)
-        driver.close()
-
-    # todo: might need a rewrite
-    def write_series_to_csv(self, tweet_ids_filename, series):
-        with open(tweet_ids_filename, 'a') as outfile:
-            series.to_csv(outfile, index=False)
 
 
 class API(object):
@@ -436,26 +328,19 @@ def get_user_tweets_in_network(api=None, users=None, collection=None,
         or user IDs
     """
     total = len(users)
-    total_tweet_count = 0
-    error_ids = set()
+    error_ids = []
 
     for i, user in zip(count(start=1), users):
         logging.info(f"PROCESSING {i} OF {total} USERS")
         try:
-            user_tweet_count = get_user_tweets(api=api, user=user,
-                                               collection=collection,
-                                               n_tweets=n_tweets)
+            get_user_tweets(api=api, user=user, collection=collection,
+                            n_tweets=n_tweets)
 
-            if not user_tweet_count:
-                raise tweepy.TweepError('0 tweet was fetched, '
-                                        f'{user} added to error ids.')
         except tweepy.TweepError as e:
             logging.error("Skipped {}, {}.\n".format(user, e))
-            error_ids.add(user)
-        else:
-            total_tweet_count += user_tweet_count
+            error_ids.append(user)
 
-    return total_tweet_count, error_ids
+    return error_ids
 
 
 def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
@@ -474,24 +359,17 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
 
     logging.info("Fetching {}'s tweets....".format(user))
 
-    for counter, status in zip(count(start=1), tweepy.Cursor(api.user_timeline,
-                                                             id=user).items(
-                                                                 n_tweets)):
-        # process status here
-        if counter % 500 == 0 and counter != 0:
-            logging.info(f'{counter}+ tweets have been retrieved for '
-                         f'USER: {user}')
+    bar = progressbar.ProgressBar()
+    for status in bar(tweepy.Cursor(api.user_timeline,
+                                    id=user).items(n_tweets)):
+
         tweet = status._json
-        id_ = {"_id": tweet['id_str']}
-        new_document = {**id_, **tweet}
 
-        try:
-            collection.insert_one(new_document)
-        except DuplicateKeyError:
-            logging.info(f"found duplicate key: {tweet['id_str']}")
-            continue
-
-    logging.info(f'Total number of tweets retrieved for USER: {user}: '
-                 f'{counter}')
-
-    return counter
+        if tweet:
+            id_ = {"_id": tweet['id_str']}
+            new_document = {**id_, **tweet}
+            try:
+                collection.insert_one(new_document)
+            except DuplicateKeyError:
+                logging.info(f"found duplicate key: {tweet['id_str']}")
+                continue

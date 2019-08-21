@@ -73,13 +73,11 @@ def main(network_filepath, keywords_filepath):
         if not os.path.exists(topic_raw_data_dir):
             os.makedirs(topic_raw_data_dir)
 
-        user_ids = nx.nodes(social_network)
+        user_ids = social_network.nodes
 
         logger.info('downloading data set from raw data')
-        tweet_count, error_ids = get_user_tweets_in_network(api=api,
-                                                            users=user_ids,
-                                                            collection=col,
-                                                            n_tweets=1000000)
+        error_ids = get_user_tweets_in_network(api=api, users=user_ids,
+                                               collection=col, n_tweets=100000)
 
         logger.info('removing ids with error from graph')
         social_network.remove_nodes_from(error_ids)
@@ -100,9 +98,18 @@ def main(network_filepath, keywords_filepath):
                          os.path.join(topic_raw_data_dir, f'{topic}.adjlist'),
                          delimiter=',')
 
+        tweet_count = col.count_documents({})
         graph_info_saveas = os.path.join(topic_reports_dir,
                                          f'{topic}-crawl-stats.txt')
-        with open(graph_info_saveas, 'a') as f:
+
+        if not os.path.exists(topic_reports_dir):
+            os.makedirs(topic_reports_dir)
+
+        mode = 'a'
+        if not os.path.exists(graph_info_saveas):
+            mode = 'w'
+
+        with open(graph_info_saveas, mode) as f:
             f.write(f'###* Info for {topic}, started at '
                     f'{current_date_and_time}.\n#\n#\n')
             f.write(nx.info(social_network))
