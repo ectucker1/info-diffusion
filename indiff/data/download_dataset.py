@@ -68,7 +68,6 @@ def main(network_filepath):
     except requests.ConnectionError:
         logger.error("No internet connection available.")
     else:
-
         if not os.path.exists(topic_raw_data_dir):
             os.makedirs(topic_raw_data_dir)
 
