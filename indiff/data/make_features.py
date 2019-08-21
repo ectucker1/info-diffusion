@@ -65,12 +65,6 @@ def main(topic, keywords_filepath):
     else:
         social_network.name = topic
 
-        # processed file path
-        parts = list(topic_raw_data_dir.parts)
-        _ = parts.pop()
-        parts[-1] = 'processed'
-        processed_root_dir = Path(*parts)
-
         # reports file path
         parts = list(topic_raw_data_dir.parts)
         if parts[-2] != 'raw':
@@ -360,9 +354,10 @@ def main(topic, keywords_filepath):
 
         # save processed dataset to hdf file
         key = utils.generate_random_id(15)
-        if not os.path.exists(processed_root_dir):
-            os.makedirs(processed_root_dir)
-        processed_saveas = os.path.join(processed_root_dir, 'dataset.h5')
+
+        # save features to a centralised raw directory
+        raw_dataset_dir = topic_raw_data_dir.parent
+        processed_saveas = os.path.join(raw_dataset_dir, 'dataset.h5')
         df.to_hdf(processed_saveas, key=key)
 
         # save key to reports directory
