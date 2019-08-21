@@ -15,8 +15,7 @@ from indiff.twitter import API, get_user_tweets_in_network
 
 @click.command()
 @click.argument('network_filepath', type=click.Path(exists=True))
-@click.argument('keywords_filepath', type=click.Path(exists=True))
-def main(network_filepath, keywords_filepath):
+def main(network_filepath):
     """ Runs data processing scripts to turn raw data from (../raw) into
         cleaned data ready to be analyzed (saved in ../processed).
     """
