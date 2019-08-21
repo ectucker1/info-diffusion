@@ -18,7 +18,7 @@ Predict the temporal dynamics of information diffusion on Twitter
 
 ## Usage
 
-### Running the pipleine for the first time
+### Running Pipleine for the first time
 
 ```bash
 make create_environment
@@ -28,24 +28,24 @@ make create_environment
 conda activate info-diffusion
 ```
 
+### Download tweets from twitter
+
 ```bash
-make data NETWORK_FILE=/root/dir-1/dir-2/topic.csv KEYWORDS_FILE=root/dir-1/dir-2/keywords.txt
+make data NETWORK_FILE=/home/user/dir/kansas-election.csv
+```
+
+### Build Features
+
+```bash
+make features TOPIC=kansas-election KEYWORDS_FILE=/home/user/dir/keywords.txt
 ```
 
 ### Delete a Topic
 
-To delete topic - twitter-trends - and its corresponding files:
+To delete topic - kansas-election - and its corresponding files:
 
 ```bash
-make clean_data TOPIC=twitter-trends
-```
-
-### Rebuild Features
-
-To rebuild features for topic - twitter-trends:
-
-```bash
-make rebuild_features TOPIC=twitter-trends KEYWORDS_FILE=root/dir-1/dir-2/keywords.txt
+make clean_data TOPIC=kansas-election
 ```
 
 ### Update Python Dependencies
