@@ -1,5 +1,7 @@
-from collections import ChainMap
+from collections import ChainMap, Counter
 
+import numpy as np
+import pandas as pd
 import progressbar
 
 
@@ -631,3 +633,93 @@ def quoted_tweets_with_media(user_id, node_collection):
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
     return attr['n_quoted_tweets_with_media']
+
+
+def compute_ratio_of_tweet_per_time_period(user):
+    periods = Counter()
+
+    all_tweets_dates = user['tweets_dates'] + \
+        user['retweeted_tweets_dates'] + user['quoted_tweets_dates']
+
+    n_all_tweets_dates = len(all_tweets_dates)
+
+    for tweet_date in all_tweets_dates:
+        h = tweet_date.hour
+
+        if h in range(0, 24):
+            period = h // 6 + 1
+            periods[str(period)] += 1
+
+    for key, value in periods.items():
+        periods[key] = value / n_all_tweets_dates
+
+    user['ratio_of_tweet_per_time_period'] = periods
+
+
+def compute_ratio_of_tweets_that_got_retweeted_per_time_period(user):
+    periods = Counter()
+
+    all_tweets_dates = user['tweets_dates'] + \
+        user['retweeted_tweets_dates'] + user['quoted_tweets_dates']
+
+    n_all_tweets_dates = len(all_tweets_dates)
+
+    retweeted_tweets_dates = user['retweeted_tweets_dates']
+
+    for tweet_date in retweeted_tweets_dates:
+        h = tweet_date.hour
+
+        if h in range(0, 24):
+            period = h // 6 + 1
+            periods[str(period)] += 1
+
+    for key, value in periods.items():
+        periods[key] = value / n_all_tweets_dates
+
+    user['ratio_of_tweets_that_got_retweeted_per_time_period'] = periods
+
+
+def compute_ratio_of_retweet_per_time_period(user):
+    periods = Counter()
+    retweeted_tweets_dates = user['retweeted_tweets_dates']
+    n_retweeted_tweets_dates = len(retweeted_tweets_dates)
+
+    for tweet_date in retweeted_tweets_dates:
+        h = tweet_date.hour
+
+        if h in range(0, 24):
+            period = h // 6 + 1
+            periods[str(period)] += 1
+
+    for key, value in periods.items():
+        if n_retweeted_tweets_dates:
+            periods[key] = value / n_retweeted_tweets_dates
+        else:
+            periods[key] = 0
+
+    user['ratio_of_retweet_per_time_period'] = periods
+
+
+def compute_A(user):
+    tweet_freq_table = {}
+    all_tweets_dates = user['tweets_dates'] + \
+        user['retweeted_tweets_dates'] + user['quoted_tweets_dates']
+
+    n_all_tweets_dates = len(all_tweets_dates)
+
+    for tweet_date in all_tweets_dates:
+        tweet_date_and_time = tweet_date
+        tweet_date = tweet_date_and_time.date
+        tweet_hour = tweet_date_and_time.hour
+        hour_bin = tweet_hour // 4
+
+        tweet_freq_table.setdefault(
+            tweet_date, {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        )[hour_bin] += 1
+
+    results = pd.DataFrame(list(tweet_freq_table.values()))
+    results = results / n_all_tweets_dates
+    results = results.values
+    sum_ = np.sum(results, axis=0)
+
+    user['A'] = sum_.tolist()
