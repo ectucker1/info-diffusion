@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 setup(
     name='indiff',
     packages=find_packages(),
-    version='0.2.0',
+    version='0.2.1',
     description='Predict the temporal dynamics of information diffusion on '
     'Twitter',
     author='GidiGidiOLU',
