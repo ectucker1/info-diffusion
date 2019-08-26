@@ -362,7 +362,8 @@ def get_user_tweets(api=None, user=None, collection=None, n_tweets=5000):
     tweet_count = 0
 
     bar = progressbar.ProgressBar()
-    cursor = tweepy.Cursor(api.user_timeline, id=user).items(n_tweets)
+    cursor = tweepy.Cursor(api.user_timeline, id=user,
+                           tweet_mode='extended').items(n_tweets)
     for status in bar(cursor):
         tweet_count += 1
         tweet = status._json
