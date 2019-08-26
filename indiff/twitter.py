@@ -6,27 +6,19 @@ import progressbar
 import tweepy
 from pymongo.errors import DuplicateKeyError
 
-from .utils import sentiment, split_text
+from indiff.utils import sentiment, split_text
 
 
-class API(object):
-    def __init__(self, consumer_key, consumer_secret, access_token,
-                 access_token_secret):
-        self.consumer_key = consumer_key
-        self.consumer_secret = consumer_secret
-        self.access_token = access_token
-        self.access_token_secret = access_token_secret
-
-    def __call__(self):
-        auth = tweepy.OAuthHandler(self.consumer_key, self.consumer_secret)
-        auth.set_access_token(self.access_token, self.access_token_secret)
-        return tweepy.API(
-            auth,
-            wait_on_rate_limit=True,
-            wait_on_rate_limit_notify=True,
-            retry_count=3,
-            retry_delay=5,
-            retry_errors=set([401, 404, 500, 503]))
+def auth(consumer_key, consumer_secret, access_token, access_token_secret):
+    auth_ = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth_.set_access_token(access_token, access_token_secret)
+    return tweepy.API(
+        auth_,
+        wait_on_rate_limit=True,
+        wait_on_rate_limit_notify=True,
+        retry_count=3,
+        retry_delay=5,
+        retry_errors=set([401, 404, 500, 503]))
 
 
 class Tweet(object):

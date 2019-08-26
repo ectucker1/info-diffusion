@@ -10,7 +10,7 @@ import pymongo
 import requests
 from dotenv import find_dotenv, load_dotenv
 
-from indiff.twitter import API, get_user_tweets_in_network
+from indiff.twitter import auth, get_user_tweets_in_network
 
 
 @click.command()
@@ -47,12 +47,10 @@ def main(network_filepath):
         access_token = os.environ.get('ACCESS_TOKEN')
         access_token_secret = os.environ.get('ACCESS_TOKEN_SECRET')
 
-        auth = API(consumer_key=consumer_key,
+        api = auth(consumer_key=consumer_key,
                    consumer_secret=consumer_secret,
                    access_token=access_token,
                    access_token_secret=access_token_secret)
-
-        api = auth()
 
         client = pymongo.MongoClient(host='localhost', port=27017,
                                      appname=__file__)
