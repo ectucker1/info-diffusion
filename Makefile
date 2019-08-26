@@ -34,12 +34,8 @@ data: test_environment test_server
 features: test_environment test_server
 	$(PYTHON_INTERPRETER) -m indiff.data.make_features $(TOPIC) $(KEYWORDS_FILE)
 
-## Restart at Building Features
-rebuild_features: test_environment test_server
-	$(PYTHON_INTERPRETER) -m indiff.data.rebuild_features $(TOPIC) $(KEYWORDS_FILE)
-
-## Export database from sqlitedict to mongodb
-export_db: test_environment test_server
+## Export database from sqlite to mongodb
+export_sqlite: test_environment test_server
 	$(PYTHON_INTERPRETER) -m indiff.data.export_db $(TOPIC)
 
 ## Delete all compiled Python files
@@ -142,7 +138,6 @@ ifneq (${CONDA_DEFAULT_ENV}, $(PROJECT_NAME))
 endif
 endif
 	$(PYTHON_INTERPRETER) test_environment.py
-
 
 ## Test that MongoDB is set-up correctly
 test_server:
