@@ -16,6 +16,17 @@ class Features(object):
         self.user = user
 
     def activity_index(self, user_id, e=30.4*24):
+        """[summary]
+
+        Arguments:
+            user_id {[type]} -- [description]
+
+        Keyword Arguments:
+            e {[type]} -- [description] (default: {30.4*24})
+
+        Returns:
+            [type] -- [description]
+        """
         number_of_user_messages = len(get_user_published_tweets(
             user_id, self.node_collection))
 
@@ -25,6 +36,14 @@ class Features(object):
             return 1
 
     def dTR(self, user_id):
+        """[summary]
+
+        Arguments:
+            user_id {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
         # change dv..... mv is okay
         n_dv = number_of_tweets_with_user_mentions(user_id,
                                                    self.node_collection)
@@ -36,6 +55,11 @@ class Features(object):
             return 0
 
     def h(self):
+        """[summary]
+
+        Returns:
+            [type] -- [description]
+        """
         src_user_mv = users_ever_mentioned(self.src_user, self.node_collection)
         dest_user_mv = users_ever_mentioned(self.dest_user,
                                             self.node_collection)
@@ -49,6 +73,11 @@ class Features(object):
             return 0
 
     def hM(self):
+        """[summary]
+
+        Returns:
+            [type] -- [description]
+        """
         mvx = users_ever_mentioned(self.src_user, self.node_collection)
 
         if self.dest_user in mvx:
@@ -57,6 +86,17 @@ class Features(object):
             return 0
 
     def mR(self, user_id, meu=200):
+        """[summary]
+
+        Arguments:
+            user_id {[type]} -- [description]
+
+        Keyword Arguments:
+            meu {int} -- [description] (default: {200})
+
+        Returns:
+            [type] -- [description]
+        """
         n_tmv = len(tweets_mentioned_in(user_id, self.node_collection))
 
         if n_tmv < meu:
@@ -65,6 +105,14 @@ class Features(object):
             return 1
 
     def hK(self, user_id):
+        """[summary]
+
+        Arguments:
+            user_id {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
         user_tweets_keywords = get_keywords_from_user_tweets(
             user_id, self.node_collection)
 
@@ -74,6 +122,14 @@ class Features(object):
             return 0
 
     def A(self, user_id):
+        """[summary]
+
+        Arguments:
+            user_id {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
         query = {'_id': user_id}
         attr = self.node_collection.find_one(query)
         return attr['A']

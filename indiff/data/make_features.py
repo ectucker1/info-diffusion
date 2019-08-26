@@ -18,6 +18,12 @@ from indiff.twitter import Tweet
 
 
 def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
+    """[summary]
+
+    Arguments:
+        tweet_mentions_collection {[type]} -- [description]
+        user_attribs_collection {[type]} -- [description]
+    """
     # calculate extra attributes
     # TODO: look for a way to make this computationally effecient since
     # we can now query a database and just change a particular part of the
@@ -54,6 +60,12 @@ def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
 
 
 def process_additional_attribs(user_attribs):
+    """[summary]
+
+    Arguments:
+        user_attribs {[type]} -- [description]
+    """
+
     # compute ratio_of_tweet_per_time_period
     build_features.compute_ratio_of_tweet_per_time_period(user_attribs)
 
@@ -70,6 +82,14 @@ def process_additional_attribs(user_attribs):
 
 def compute_user_attribs(user_id, user_attribs, user_tweets,
                          tweet_mentions_collection):
+    """[summary]
+
+    Arguments:
+        user_id {[type]} -- [description]
+        user_attribs {[type]} -- [description]
+        user_tweets {[type]} -- [description]
+        tweet_mentions_collection {[type]} -- [description]
+    """
     bar = progressbar.ProgressBar(prefix=f"Computing {user_id}'s "
                                   "Attributes: ")
     for user_tweet in bar(user_tweets):
@@ -190,6 +210,14 @@ def compute_user_attribs(user_id, user_attribs, user_tweets,
 
 def processed_user_attribs(users, tweet_collection, tweet_mentions_collection,
                            user_attribs_collection):
+    """[summary]
+
+    Arguments:
+        users {[type]} -- [description]
+        tweet_collection {[type]} -- [description]
+        tweet_mentions_collection {[type]} -- [description]
+        user_attribs_collection {[type]} -- [description]
+    """
     n_user_ids = len(users)
 
     for i, user_id in zip(count(start=1), users):
