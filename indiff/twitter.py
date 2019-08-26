@@ -73,7 +73,7 @@ class Tweet(object):
             String -- The actual UTF-8 text of the status update
         """
 
-        return self.tweet['text']
+        return self.tweet['full_text']
 
     @property
     def created_at(self):
