@@ -765,13 +765,16 @@ def compute_A(user):
 
     for tweet_date in all_tweets_dates:
         tweet_date_and_time = tweet_date
-        tweet_date = tweet_date_and_time.date
+        tweet_date = tweet_date_and_time.date()
         tweet_hour = tweet_date_and_time.hour
         hour_bin = tweet_hour // 4
 
-        tweet_freq_table.setdefault(
-            tweet_date, {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-        )[hour_bin] += 1
+        tweet_freq_table.setdefault(tweet_date, {0: 0,
+                                                 1: 0,
+                                                 2: 0,
+                                                 3: 0,
+                                                 4: 0,
+                                                 5: 0})[hour_bin] += 1
 
     results = pd.DataFrame(list(tweet_freq_table.values()))
     results = results / n_all_tweets_dates
