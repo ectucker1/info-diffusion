@@ -7,8 +7,8 @@
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 BUCKET = [OPTIONAL] your-bucket-for-syncing-data (do not include 's3://')
 PROFILE = default
-PROJECT_NAME = info-diffusion
-MODULE_NAME = indiff
+PROJECT_NAME = tweetflow
+MODULE_NAME = tweetflow
 PYTHON_INTERPRETER = python3
 VIRTUALENV = conda
 CONDA_EXE ?= ~/anaconda3/bin/conda
@@ -28,15 +28,15 @@ endif
 
 ## Download Tweet into mongodb
 data: test_environment test_server
-	$(PYTHON_INTERPRETER) -m indiff.data.download_dataset $(NETWORK_FILE)
+	$(PYTHON_INTERPRETER) -m tweetflow.data.download_dataset $(NETWORK_FILE)
 
 ## Building Features
 features: test_environment test_server
-	$(PYTHON_INTERPRETER) -m indiff.data.make_features $(TOPIC) $(KEYWORDS_FILE)
+	$(PYTHON_INTERPRETER) -m tweetflow.data.make_features $(TOPIC) $(KEYWORDS_FILE)
 
 ## Export database from sqlite to mongodb
 export_sqlite: test_environment test_server
-	$(PYTHON_INTERPRETER) -m indiff.data.export_db $(TOPIC)
+	$(PYTHON_INTERPRETER) -m tweetflow.data.export_db $(TOPIC)
 
 ## Delete all compiled Python files
 clean:
@@ -45,7 +45,7 @@ clean:
 
 ## Lint using flake8
 lint:
-	flake8 indiff
+	flake8 tweetflow
 
 ## Delete given topic data
 ## make clean_data TOPIC=small-network-5
