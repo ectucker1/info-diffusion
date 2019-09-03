@@ -16,16 +16,18 @@ class Features(object):
         self.user = user
 
     def activity_index(self, user_id, e=30.4*24):
-        """[summary]
+        """Expresses user's volume of tweets.
+        The activity is computed as the average amount of tweets emitted per
+        hour bounded by 1
 
         Arguments:
-            user_id {[type]} -- [description]
+            user_id {str} -- user ID
 
         Keyword Arguments:
-            e {[type]} -- [description] (default: {30.4*24})
+            e {float} -- hourly frequency (default: {30.4*24})
 
         Returns:
-            [type] -- [description]
+            float -- average amount of tweets
         """
         number_of_user_messages = len(get_user_published_tweets(
             user_id, self.node_collection))
@@ -36,15 +38,16 @@ class Features(object):
             return 1
 
     def dTR(self, user_id):
-        """[summary]
+        """Computes ratio of directed tweets for a user.
+        This provides an idea about the role she plays in the spread
+        of information.
 
         Arguments:
-            user_id {[type]} -- [description]
+            user_id {str} -- User ID
 
         Returns:
-            [type] -- [description]
+            float -- user's ratio of directed tweets
         """
-        # change dv..... mv is okay
         n_dv = number_of_tweets_with_user_mentions(user_id,
                                                    self.node_collection)
         n_mv = len(get_user_published_tweets(user_id, self.node_collection))
@@ -55,10 +58,14 @@ class Features(object):
             return 0
 
     def h(self):
-        """[summary]
+        """Computes social homogeneity index for vx ∈ V and vy ∈ V.
+        This reflects the overlap of the sets of users they interact with.
+        It is computed with the Jaccard similarity index that is defined as the
+        size of the intersection of the sets divided by the size of their
+        union.
 
         Returns:
-            [type] -- [description]
+            float -- social homogeneity index
         """
         src_user_mv = users_ever_mentioned(self.src_user, self.node_collection)
         dest_user_mv = users_ever_mentioned(self.dest_user,
@@ -73,10 +80,13 @@ class Features(object):
             return 0
 
     def hM(self):
-        """[summary]
+        """Computes a boolean value for each user regarding the mentioning
+        behaviour to capture the existence of an active interaction in the
+        past. This feature can be somehow regarded as a “friendship” indicator
+        in the case where both users have a positive value.
 
         Returns:
-            [type] -- [description]
+            boolean -- mentioning behaviour
         """
         mvx = users_ever_mentioned(self.src_user, self.node_collection)
 
@@ -86,13 +96,14 @@ class Features(object):
             return 0
 
     def mR(self, user_id, meu=200):
-        """[summary]
+        """Computes the volume of directed tweets received by a user.
 
         Arguments:
-            user_id {[type]} -- [description]
+            user_id {str} -- User ID
 
         Keyword Arguments:
-            meu {int} -- [description] (default: {200})
+            meu {int} -- value chosen based on empirical observation of the
+            distribution of the mention rates (default: {200})
 
         Returns:
             [type] -- [description]
@@ -105,13 +116,13 @@ class Features(object):
             return 1
 
     def hK(self, user_id):
-        """[summary]
+        """Has the user tweeted about the given topic?
 
         Arguments:
-            user_id {[type]} -- [description]
+            user_id {str} -- User ID
 
         Returns:
-            [type] -- [description]
+            int -- 0 if False or 1 if True
         """
         user_tweets_keywords = get_keywords_from_user_tweets(
             user_id, self.node_collection)
@@ -122,27 +133,24 @@ class Features(object):
             return 0
 
     def A(self, user_id):
-        """[summary]
+        """Computes temporal dimension so that fluctuation of users attention
+        through time can be captured.
 
         Arguments:
-            user_id {[type]} -- [description]
+            user_id {str} -- User ID
 
         Returns:
-            [type] -- [description]
+            list -- receptivity level of a user over 6 bins of 4 hours each
         """
         query = {'_id': user_id}
         attr = self.node_collection.find_one(query)
         return attr['A']
 
     def y(self):
-        """checks whether there's a diffusion from src to dest
-
-        Arguments:
-            src {[type]} -- [description]
-            dest {[type]} -- [description]
+        """Checks whether diffusion exists between two users.
 
         Returns:
-            int -- return 1 if diffusion exists, else 0
+            int -- Returns 0 if False, 1 if True
         """
         query = {'_id': self.dest_user}
         attr = self.node_collection.find_one(query)
