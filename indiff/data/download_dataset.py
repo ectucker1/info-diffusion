@@ -16,8 +16,7 @@ from indiff.twitter import auth, get_user_tweets_in_network
 @click.command()
 @click.argument('network_filepath', type=click.Path(exists=True))
 def main(network_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
+    """ Downloads Users' Tweets
     """
     logger = logging.getLogger(__name__)
     current_date_and_time = datetime.now()
