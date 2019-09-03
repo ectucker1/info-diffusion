@@ -17,79 +17,16 @@ from indiff.features import build_features
 from indiff.twitter import Tweet
 
 
-def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
-    """[summary]
+def compute_user_attribs(user_attribs, user_tweets, tweet_mentions_collection):
+    """ Computes a user's attributes
 
     Arguments:
-        tweet_mentions_collection {[type]} -- [description]
-        user_attribs_collection {[type]} -- [description]
+        user_attribs {dict} -- user attributes
+        user_tweets {collection} -- all tweets by user
+        tweet_mentions_collection {collection} -- tweets with user mentions
     """
-    # calculate extra attributes
-    # TODO: look for a way to make this computationally effecient since
-    # we can now query a database and just change a particular part of the
-    # database.
-    # get all tweets in database
-    n_tweets = tweet_mentions_collection.count_documents({})
-    if n_tweets:
-        logging.info('update user attribs with tweets mentioned in')
+    user_id = user_attribs['_id']
 
-        tweets = tweet_mentions_collection.find({})
-        bar = progressbar.ProgressBar(maxlen=n_tweets)
-        for tweet_document in bar(tweets):
-            tweet_id = tweet_document['_id']
-            users_mentioned = tweet_document['users']
-
-            for user in users_mentioned:
-                # check if user exists in user_attribs_collection
-                query_user_attr = {"_id": user}
-                document_count = user_attribs_collection.count_documents(
-                    query_user_attr)
-                if document_count:
-                    user_attr_document = user_attribs_collection.find_one(
-                        query_user_attr)
-
-                    # update the document
-                    mentioned_in = user_attr_document['mentioned_in']
-                    mentioned_in.append(tweet_id)
-                    new_values = {"$set": {
-                        "mentioned_in": mentioned_in
-                        }}
-
-                    user_attribs_collection.update_one(
-                        query_user_attr, new_values)
-
-
-def process_additional_attribs(user_attribs):
-    """[summary]
-
-    Arguments:
-        user_attribs {[type]} -- [description]
-    """
-
-    # compute ratio_of_tweet_per_time_period
-    build_features.compute_ratio_of_tweet_per_time_period(user_attribs)
-
-    # compute ratio_of_tweets_that_got_retweeted_per_time_period
-    build_features.compute_ratio_of_tweets_that_got_retweeted_per_time_period(
-        user_attribs)
-
-    # compute ratio_of_retweet_per_time_period
-    build_features.compute_ratio_of_retweet_per_time_period(user_attribs)
-
-    # compute get_A
-    build_features.compute_A(user_attribs)
-
-
-def compute_user_attribs(user_id, user_attribs, user_tweets,
-                         tweet_mentions_collection):
-    """[summary]
-
-    Arguments:
-        user_id {[type]} -- [description]
-        user_attribs {[type]} -- [description]
-        user_tweets {[type]} -- [description]
-        tweet_mentions_collection {[type]} -- [description]
-    """
     bar = progressbar.ProgressBar(prefix=f"Computing {user_id}'s "
                                   "Attributes: ")
     for user_tweet in bar(user_tweets):
@@ -208,22 +145,23 @@ def compute_user_attribs(user_id, user_attribs, user_tweets,
             user_attribs['n_tweets_with_user_mentions'] += 1
 
 
-def processed_user_attribs(users, tweet_collection, tweet_mentions_collection,
-                           user_attribs_collection):
-    """[summary]
+def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
+                         user_attribs_collection):
+    """ Computes user attributes for multiple users
 
     Arguments:
-        users {[type]} -- [description]
-        tweet_collection {[type]} -- [description]
-        tweet_mentions_collection {[type]} -- [description]
-        user_attribs_collection {[type]} -- [description]
+        users {list} -- user ids
+        tweet_collection {collection} -- tweets
+        tweet_mentions_collection {collection} -- tweets with user mentions
+        user_attribs_collection {collection} -- user attributes
     """
     n_user_ids = len(users)
 
     for i, user_id in zip(count(start=1), users):
         logging.info(f"PROCESSING NODE ATTR FOR {user_id}: "
                      f"{i} OF {n_user_ids} USERS")
-        user_attribs = {'tweets': [],
+        user_attribs = {'_id': user_id,
+                        'tweets': [],
                         'n_tweets_with_hashtags': 0,
                         'n_tweets_with_urls': 0,
                         'n_tweets_with_media': 0,
@@ -265,21 +203,18 @@ def processed_user_attribs(users, tweet_collection, tweet_mentions_collection,
 
         # compute user atribs
         compute_user_attribs(
-            user_id=user_id, user_attribs=user_attribs,
+            user_attribs=user_attribs,
             user_tweets=user_tweets,
             tweet_mentions_collection=tweet_mentions_collection
             )
 
-        process_additional_attribs(user_attribs=user_attribs)
-        # write node attributes as document to database
-        id_ = {"_id": user_id}
-        new_document = {**id_, **user_attribs}
-
+        update_user_attribs(user_attribs=user_attribs)
+        # write user attributes as document to database
         try:
-            user_attribs_collection.insert_one(new_document)
+            user_attribs_collection.insert_one(user_attribs)
         except pymongo.errors.DuplicateKeyError:
             logging.info(f'updating node attribute for {user_id}')
-            user_attribs_collection.replace_one(id_, new_document)
+            user_attribs_collection.replace_one(user_id, user_attribs)
         except pymongo.errors.InvalidDocument as err:
             logging.error('found an invalid document')
             logging.error(err)
@@ -287,12 +222,75 @@ def processed_user_attribs(users, tweet_collection, tweet_mentions_collection,
     compute_mentioned_in(tweet_mentions_collection, user_attribs_collection)
 
 
+def update_user_attribs(user_attribs):
+    """ Updates a user's attributes with four additional features
+
+    Arguments:
+        user_attribs {dict} -- user attributes
+    """
+
+    # compute ratio_of_tweet_per_time_period
+    build_features.compute_ratio_of_tweet_per_time_period(user_attribs)
+
+    # compute ratio_of_tweets_that_got_retweeted_per_time_period
+    build_features.compute_ratio_of_tweets_that_got_retweeted_per_time_period(
+        user_attribs)
+
+    # compute ratio_of_retweet_per_time_period
+    build_features.compute_ratio_of_retweet_per_time_period(user_attribs)
+
+    # compute get_A
+    build_features.compute_A(user_attribs)
+
+
+def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
+    """ Computes tweets a user is mentioned in
+
+    Arguments:
+        tweet_mentions_collection {collection} -- a collection of tweet and
+        user mentions
+        user_attribs_collection {collection} -- a collection of user attributes
+    """
+    # calculate extra attributes
+    # TODO: look for a way to make this computationally effecient since
+    # we can now query a database and just change a particular part of the
+    # database.
+    # get all tweets in database
+    n_tweets = tweet_mentions_collection.count_documents({})
+    if n_tweets:
+        logging.info('update user attribs with tweets mentioned in')
+
+        tweets = tweet_mentions_collection.find({})
+        bar = progressbar.ProgressBar(maxlen=n_tweets)
+        for tweet_document in bar(tweets):
+            tweet_id = tweet_document['_id']
+            users_mentioned = tweet_document['users']
+
+            for user in users_mentioned:
+                # check if user exists in user_attribs_collection
+                query_user_attr = {"_id": user}
+                document_count = user_attribs_collection.count_documents(
+                    query_user_attr)
+                if document_count:
+                    user_attr_document = user_attribs_collection.find_one(
+                        query_user_attr)
+
+                    # update the document
+                    mentioned_in = user_attr_document['mentioned_in']
+                    mentioned_in.append(tweet_id)
+                    new_values = {"$set": {
+                        "mentioned_in": mentioned_in
+                        }}
+
+                    user_attribs_collection.update_one(
+                        query_user_attr, new_values)
+
+
 @click.command()
 @click.argument('topic')
 @click.argument('keywords_filepath', type=click.Path(exists=True))
 def main(topic, keywords_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
+    """ Runs feature extraction scripts to generate raw data.
     """
     logger = logging.getLogger(__name__)
     current_date_and_time = datetime.now()
@@ -346,7 +344,7 @@ def main(topic, keywords_filepath):
 
         # initialise node attributes to have desired info from dataset
         user_ids = nx.nodes(social_network)
-        processed_user_attribs(
+        process_user_attribs(
             users=user_ids, tweet_collection=tweet_collection,
             tweet_mentions_collection=tweet_mentions_collection,
             user_attribs_collection=user_attribs_collection

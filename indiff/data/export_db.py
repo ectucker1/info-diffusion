@@ -14,8 +14,7 @@ from sqlitedict import SqliteDict
 @click.command()
 @click.argument('topic')
 def main(topic):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
+    """ Export a topic's data from sqlite to mongodb
     """
     logger = logging.getLogger(__name__)
 
