@@ -6,7 +6,7 @@ import progressbar
 import tweepy
 from pymongo.errors import DuplicateKeyError
 
-from indiff.utils import sentiment, split_text
+from tweetflow.utils import sentiment, split_text
 
 
 def auth(consumer_key, consumer_secret, access_token, access_token_secret):

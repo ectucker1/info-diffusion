@@ -12,9 +12,9 @@ import progressbar
 import pymongo
 from dotenv import find_dotenv, load_dotenv
 
-from indiff import utils
-from indiff.features import build_features
-from indiff.twitter import Tweet
+from tweetflow import utils
+from tweetflow.features import build_features
+from tweetflow.twitter import Tweet
 
 
 def compute_user_attribs(user_attribs, user_tweets, tweet_mentions_collection):

@@ -1,4 +1,4 @@
-name: info-diffusion
+name: tweetflow
 channels:
   - districtdatalabs
   - anaconda
