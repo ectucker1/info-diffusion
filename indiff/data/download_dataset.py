@@ -10,7 +10,7 @@ import pymongo
 import requests
 from dotenv import find_dotenv, load_dotenv
 
-from tweetflow.twitter import auth, get_user_tweets_in_network
+from indiff.twitter import auth, get_user_tweets_in_network
 
 
 @click.command()
