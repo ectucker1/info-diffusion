@@ -214,7 +214,7 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
             user_attribs_collection.insert_one(user_attribs)
         except pymongo.errors.DuplicateKeyError:
             logging.info(f'updating node attribute for {user_id}')
-            user_attribs_collection.replace_one(user_id, user_attribs)
+            user_attribs_collection.replace_one({'_id': user_id}, user_attribs)
         except pymongo.errors.InvalidDocument as err:
             logging.error('found an invalid document')
             logging.error(err)
