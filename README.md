@@ -8,7 +8,7 @@
 
 ## About
 
-Predict the temporal dynamics of information diffusion on Twitter
+Identifying features relevant to information diffusion in Twitter events
 
 ## Getting Started
 
@@ -31,21 +31,21 @@ conda activate info-diffusion
 ### Download tweets from twitter
 
 ```bash
-make data NETWORK_FILE=/home/user/dir/kansas-election.csv
+make data NETWORK_FILE=PATH_TO_NETWORK_FILE.csv
 ```
 
 ### Build Features
 
 ```bash
-make features TOPIC=kansas-election KEYWORDS_FILE=/home/user/dir/keywords.txt
+make features TOPIC=FILENAME KEYWORDS_FILE=PATH_TO_KEYWORDS_FILE.txt
 ```
 
 ### Delete a Topic
 
-To delete topic - kansas-election - and its corresponding files:
+To delete topic - TOPIC - and its corresponding files:
 
 ```bash
-make clean_data TOPIC=kansas-election
+make clean_data TOPIC=FILENAME
 ```
 
 ### Update Python Dependencies
