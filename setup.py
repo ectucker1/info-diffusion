@@ -4,8 +4,7 @@ setup(
     name='indiff',
     packages=find_packages(),
     version='0.2.1',
-    description='Predict the temporal dynamics of information diffusion on '
-    'Twitter',
-    author='GidiGidiOLU',
+    description='Modelling Information Diffusion in Trending and Informative Twitter Events: Relevant Features and Model Differences ',
+    author='ariseabiola',
     license='',
 )
