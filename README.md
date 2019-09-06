@@ -8,7 +8,7 @@
 
 ## About
 
-Identifying features relevant to information diffusion in Twitter events
+Modelling Information Diffusion in Trending and Informative Twitter Events: Relevant Features and Model Differences
 
 ## Getting Started
 
