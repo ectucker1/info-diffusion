@@ -68,7 +68,7 @@ class Tweet(object):
         if 'full_text' in self.tweet:
             return self.tweet['full_text']
 
-        return self.text['text']
+        return self.tweet['text']
 
     @property
     def created_at(self):
