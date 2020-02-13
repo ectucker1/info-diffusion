@@ -8,7 +8,9 @@
 
 ## About
 
-Modelling Information Diffusion in Trending and Informative Twitter Events: Relevant Features and Model Differences
+MIDMod-OSN: A Microscopic-level Information Diffusion Model for Online Social Networks.
+
+The codes in this repository were used in a research experiment focused on identifying the features that make posts trend on Twitter.
 
 ## Getting Started
 
