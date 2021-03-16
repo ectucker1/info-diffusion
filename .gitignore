@@ -95,3 +95,6 @@ target/
 # ignore html files
 *.html
 *.css
+
+# keyword input files
+*.txt

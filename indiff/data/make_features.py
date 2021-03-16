@@ -17,32 +17,34 @@ from indiff.features import build_features
 from indiff.twitter import Tweet
 
 
-def compute_user_attribs(user_attribs, user_tweets, tweet_mentions_collection):
+def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_collection, tweet_mentions_collection):
     """ Computes a user's attributes
 
     Arguments:
         user_attribs {dict} -- user attributes
         user_tweets {collection} -- all tweets by user
+        users_collection {collection} -- collection with all users
         tweet_mentions_collection {collection} -- tweets with user mentions
     """
     user_id = user_attribs['_id']
+
+    user = users_collection.find_one({'id': user_id})
+
+    if not user_attribs['followers_count']:
+        user_attribs['followers_count'] = user['public_metrics']['followers_count']
+
+    if not user_attribs['friends_count']:
+        user_attribs['friends_count'] = user['public_metrics']['following_count']
+
+    if not user_attribs['description']:
+        user_attribs['description'] = user['description']
 
     bar = progressbar.ProgressBar(prefix=f"Computing {user_id}'s "
                                   "Attributes: ")
     for user_tweet in bar(user_tweets):
         tweet = Tweet(user_tweet)
 
-        if not user_attribs['followers_count']:
-            user_attribs['followers_count'] = tweet.owner_followers_count
-
-        if not user_attribs['friends_count']:
-            user_attribs['friends_count'] = tweet.owner_friends_count
-
-        user_description = tweet.owner_description
-        if user_description and user_attribs['description'] is not None:
-            user_attribs['description'] = user_description
-
-        orig_owner_id = tweet.original_owner_id
+        orig_owner_id = tweet.original_owner_id(tweet_collection)
         if orig_owner_id != user_id:
             user_attribs['all_possible_original_tweet_owners'].append(
                 orig_owner_id)
@@ -146,13 +148,14 @@ def compute_user_attribs(user_attribs, user_tweets, tweet_mentions_collection):
 
 
 def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
-                         user_attribs_collection):
+                         users_collection, user_attribs_collection):
     """ Computes user attributes for multiple users
 
     Arguments:
         users {list} -- user ids
         tweet_collection {collection} -- tweets
         tweet_mentions_collection {collection} -- tweets with user mentions
+        users_collection {collection} -- user data objects
         user_attribs_collection {collection} -- user attributes
     """
     n_user_ids = len(users)
@@ -198,13 +201,15 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
                         'quoted_tweets_dates': [],
                         }
 
-        query = {"user.id_str": user_id}
+        query = {"author_id": user_id}
         user_tweets = tweet_collection.find(query)
 
         # compute user atribs
         compute_user_attribs(
             user_attribs=user_attribs,
             user_tweets=user_tweets,
+            users_collection=users_collection,
+            tweet_collection=tweet_collection,
             tweet_mentions_collection=tweet_mentions_collection
             )
 
@@ -313,6 +318,7 @@ def main(topic, keywords_filepath):
         db = client[db_name]
         tweet_collection = db[topic]
         user_attribs_collection = db[topic + "-user-attribs"]
+        users_collection = db[topic + "-users"]
         tweet_mentions_collection = db[topic + "-mentions"]
 
         if db_name not in client.list_database_names():
@@ -347,6 +353,7 @@ def main(topic, keywords_filepath):
         process_user_attribs(
             users=user_ids, tweet_collection=tweet_collection,
             tweet_mentions_collection=tweet_mentions_collection,
+            users_collection=users_collection,
             user_attribs_collection=user_attribs_collection
             )
         keywords = utils.get_keywords_from_file(keywords_filepath)

@@ -144,7 +144,10 @@ class Features(object):
         """
         query = {'_id': user_id}
         attr = self.node_collection.find_one(query)
-        return attr['A']
+        if attr['A']:
+            return attr['A']
+        # TODO Verify this is correct empty value
+        return [0, 0, 0, 0, 0, 0]
 
     def y(self):
         """Checks whether diffusion exists between two users.
@@ -169,7 +172,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # TODO: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return total_number_of_tweets_retweeted / total_number_of_tweets
 
     def avg_number_of_tweets_with_hastags(self, user_id):
@@ -179,7 +183,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # TODO: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return n_tweets_with_hashtags / total_number_of_tweets
 
     def avg_number_of_retweets_with_hastags(self, user_id):
@@ -189,7 +194,8 @@ class Features(object):
         n_retweeted_tweets = number_of_retweeted_tweets(user_id,
                                                         self.node_collection)
 
-        # todo: might need to check for divisible by zero
+        if n_retweeted_tweets == 0:
+            return 0
         if n_retweeted_tweets:
             return n_retweets_with_hashtags / n_retweeted_tweets
         else:
@@ -202,7 +208,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # TODO: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return n_retweeted_tweets / total_number_of_tweets
 
     def avg_number_of_tweets(self, user_id):
@@ -211,7 +218,7 @@ class Features(object):
             user_id, self.node_collection))
         n_days = get_user_number_of_tweet_days(user_id, self.node_collection)
 
-        if total_number_of_tweets and n_days == 0:
+        if n_days == 0:
             n_days = 1
 
         avg = total_number_of_tweets / n_days
@@ -231,7 +238,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # todo: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return count / total_number_of_tweets
 
     def avg_number_followers(self, user_id):
@@ -282,7 +290,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # todo: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return all_tweets_with_mentions_count / total_number_of_tweets
 
     def avg_url_per_retweet(self, user_id):
@@ -292,7 +301,8 @@ class Features(object):
         n_retweeted_tweets = number_of_retweeted_tweets(user_id,
                                                         self.node_collection)
 
-        # todo: might need to check for divisible by zero
+        if n_retweeted_tweets == 0:
+            return 0
         if n_retweeted_tweets:
             return n_retweeted_tweets_with_url / n_retweeted_tweets
         else:
@@ -309,7 +319,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # todo: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return n_tweets_with_url / total_number_of_tweets
 
     def avg_number_of_media_in_retweets(self, user_id):
@@ -319,7 +330,8 @@ class Features(object):
         n_retweeted_tweets = number_of_retweeted_tweets(user_id,
                                                         self.node_collection)
 
-        # todo: might need to check for divisible by zero
+        if n_retweeted_tweets == 0:
+            return 0
         if n_retweeted_tweets:
             return n_retweets_with_media / n_retweeted_tweets
         else:
@@ -335,7 +347,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
-        # todo: might need to check for divisible by zero
+        if total_number_of_tweets == 0:
+            return 0
         return n_tweets_with_media / total_number_of_tweets
 
     def description(self, user_id):
@@ -374,6 +387,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
+        if total_number_of_tweets == 0:
+            return 0
         return number_of_favorited_tweets / total_number_of_tweets
 
     def avg_time_before_retweet_quote_favorite(self):
@@ -389,6 +404,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
+        if total_number_of_tweets == 0:
+            return 0
         return number_of_positive_sentiments / total_number_of_tweets
 
     def avg_negative_sentiment_of_tweets(self, user_id):
@@ -400,6 +417,8 @@ class Features(object):
         total_number_of_tweets = len(get_user_published_tweets(
             user_id, self.node_collection))
 
+        if total_number_of_tweets == 0:
+            return 0
         return number_of_negative_sentiments / total_number_of_tweets
 
     def ratio_of_tweet_per_time_period(self, user_id):
@@ -658,6 +677,8 @@ def get_user_number_of_tweet_days(user_id, node_collection):
     tweet_min_date = attr['tweet_min_date']
     diff = tweet_max_date - tweet_min_date
 
+    if diff == 0:
+        return 0
     return diff.days
 
 

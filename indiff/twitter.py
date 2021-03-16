@@ -55,7 +55,7 @@ class Tweet(object):
                 for this Tweet
         """
 
-        return self.tweet['id_str']
+        return self.tweet['id']
 
     @property
     def text(self):
@@ -77,8 +77,10 @@ class Tweet(object):
         Returns:
             [type] -- [description]
         """
-        return datetime.datetime.strptime(
-            self.tweet['created_at'], "%a %b %d %H:%M:%S %z %Y")
+        date = self.tweet['created_at']
+        if isinstance(date, datetime.datetime):
+            return date
+        return datetime.datetime.strptime(str(date), "%a %b %d %H:%M:%S %z %Y")
 
     @property
     def keywords(self):
@@ -129,10 +131,9 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return self.tweet['user']['id_str']
+        return self.tweet['author_id']
 
-    @property
-    def original_owner_id(self):
+    def original_owner_id(self, tweet_collection):
         """ this method should be called if the tweet is either a retweet or
         quoted.
 
@@ -151,15 +152,23 @@ class Tweet(object):
         """
 
         if self.is_retweeted_tweet:
-            tweet_ = self.tweet['retweeted_status']
-            return tweet_['user']['id_str']
+            for referenced in self.tweet['referenced_tweets']:
+                if referenced['type'] == 'retweeted':
+                    # TODO Expand data collection to find these
+                    tweet_ = tweet_collection.find_one({"id": referenced['id']})
+                    if tweet_:
+                        return tweet_['author_id']
 
         if self.is_quoted_tweet:
-            tweet_ = self.tweet['quoted_status']
-            return tweet_['user']['id_str']
+            for referenced in self.tweet['referenced_tweets']:
+                if referenced['type'] == 'quoted':
+                    # TODO Expand data collection to find thse
+                    tweet_ = tweet_collection.find_one({"id": referenced['id']})
+                    if tweet_:
+                        return tweet_['author_id']
 
-        if self.tweet['in_reply_to_user_id_str'] is not None:
-            return self.tweet['in_reply_to_user_id_str']
+        if 'in_reply_to_user_id' in self.tweet:
+            return self.tweet['in_reply_to_user_id']
 
         return self.owner_id
 
@@ -171,7 +180,11 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return True if 'retweeted_status' in self.tweet else False
+        if 'referenced_tweets' in self.tweet:
+            for referenced in self.tweet['referenced_tweets']:
+                if referenced['type'] == 'retweeted':
+                    return True
+        return False
 
     @property
     def is_quoted_tweet(self):
@@ -181,7 +194,11 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return True if 'quoted_status' in self.tweet else False
+        if 'referenced_tweets' in self.tweet:
+            for referenced in self.tweet['referenced_tweets']:
+                if referenced['type'] == 'quoted':
+                    return True
+        return False
 
     @property
     def hashtags(self):
@@ -223,11 +240,11 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        entities = self.tweet.get('entities', {})
-        if not entities:
-            return entities
+        attachments = self.tweet.get('attachments', {})
+        if not attachments:
+            return attachments
 
-        media = entities.get('media', [])
+        media = attachments.get('media_keys', [])
 
         return media
 
@@ -239,7 +256,7 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return self.tweet['retweet_count']
+        return self.tweet['public_metrics']['retweet_count']
 
     @property
     def is_retweeted(self):
@@ -269,7 +286,7 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return True if self.tweet['favorite_count'] else False
+        return True if self.tweet['public_metrics']['like_count'] else False
 
     @property
     def is_positive_sentiment(self):
