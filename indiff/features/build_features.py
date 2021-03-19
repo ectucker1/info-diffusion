@@ -564,6 +564,9 @@ class Features(object):
 
     def to_dict(self):
         default_features = {
+             # NB: The src_id and dest_id features are not in the range 0-1, and should probably not actually be input to a model
+            'src_id': self.src_user,
+            'dest_id': self.dest_user,
             'H': self.h(),
             'hM': self.hM(),
             'y': self.y(),
