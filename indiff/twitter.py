@@ -107,11 +107,13 @@ class Tweet(object):
 
         entities = self.tweet.get('entities', {})
         if not entities:
-            return entities
+            return []
 
         users_mentions = entities.get('mentions', [])
         if not users_mentions:
             return [mention['username'] for mention in users_mentions]
+
+        return []
 
     @property
     def owner_description(self):
@@ -177,6 +179,26 @@ class Tweet(object):
             return self.tweet['in_reply_to_user_id']
 
         return self.owner_id
+
+    @property
+    def original_tweet_id(self):
+        """ Returns the original id this tweet is in response to """
+
+        for referenced in self.tweet['referenced_tweets']:
+            if referenced['type'] == 'retweeted':
+                return referenced['id']
+            if referenced['type'] == 'quoted':
+                return referenced['id']
+            if referenced['type'] == 'replied_to':
+                return referenced['id']
+
+        # For old tweet format
+        if 'retweeted_status' in self.tweet:
+            return self.tweet['retweeted_status']['id_str']
+        if 'quoted_status' in self.tweet:
+            return self.tweet['quoted_status']['id_str']
+
+        return None
 
     @property
     def is_retweeted_tweet(self):

@@ -617,6 +617,112 @@ class Features(object):
                 count += 1
         return count
 
+    def event_is_positive(self, user_id):
+        """ Returns 1 if the event tweet for the given user is positive, 0 otherwise """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        if event.is_positive_sentiment:
+            return 1
+        else:
+            return 0
+
+    def event_is_negative(self, user_id):
+        """ Returns 1 if the event tweet for the given user is negative, 0 otherwise """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        if event.is_negative_sentiment:
+            return 1
+        else:
+            return 0
+
+    def event_is_directed_to(self, src_id, target_id):
+        """ Returns 1 if the event tweet for the given user is directed to the target """
+        event = get_event_tweet(src_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        # TODO Verify mentions are working right
+        if target_id in event.users_mentioned:
+            return 1
+        else:
+            return 0
+
+    def event_has_hashtags(self, user_id):
+        """ Returns 1 if the event tweet for the given user has a hashtag """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        if event.hashtags:
+            return 1
+        else:
+            return 0
+
+    def event_has_media(self, user_id):
+        """ Returns 1 if the event tweet for the given user has media """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        if event.media:
+            return 1
+        else:
+            return 0
+
+    def event_has_url(self, user_id):
+        """ Returns 1 if the event tweet for the given user has media """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        if event.urls:
+            return 1
+        else:
+            return 0
+
+    def event_has_response(self, user_id, responder_id):
+        """ Returns 1 if the event tweet for the given user has a response, false otherwise """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        for response in get_responses(responder_id, self.node_collection, self.tweet_collection,
+                                      self.retweets_collection):
+            if response.original_tweet_id == event.id:
+                return 1
+
+        return 0
+
+    def event_response_time(self, user_id, responder_id):
+        """ Returns 1 if the event tweet for the given user has a response, false otherwise """
+        event = get_event_tweet(user_id, self.tweet_collection)
+
+        if event is None:
+            return 0
+
+        found_response = None
+        for response in get_responses(responder_id, self.node_collection, self.tweet_collection,
+                                      self.retweets_collection):
+            if response.original_tweet_id == event.id:
+                found_response = response
+                break
+
+        if found_response is None:
+            return 0
+        else:
+            return (found_response.created_at - event.created_at).total_seconds()
+
     def additional_features(self, user_id, user=None):
         return {
             f'{user}_I': self.activity_index(user_id),
@@ -752,13 +858,20 @@ class Features(object):
             {dict} -- mapping of feature names to values
         """
         return {
-            'dest_num_responses_to_src': self.dest_num_responses_to_src(),
-            'dest_num_responses_to_mentions': self.dest_num_responses_to_mentions(),
-            'dest_avg_positive_sentiment_responses': self.dest_avg_positive_sentiment_responses(),
-            'dest_avg_negative_sentiment_responses': self.dest_avg_negative_sentiment_responses(),
-            'dest_num_responses_to_media': self.dest_num_responses_to_media(),
-            'dest_num_responses_to_hashtags': self.dest_num_responses_to_hashtags(),
-            'dest_num_responses_to_urls': self.dest_num_responses_to_urls()
+            'src_num_directed_dest': self.src_num_directed_dest(),
+            'src_avg_positive_sentiment_directed_dest': self.src_avg_positive_sentiment_directed_dest(),
+            'src_avg_negative_sentiment_directed_dest': self.src_avg_negative_sentiment_directed_dest(),
+            'src_num_with_media': number_of_tweets_with_media(self.src_user, self.node_collection),
+            'src_num_with_hashtags': number_of_tweets_with_hashtags(self.src_user, self.node_collection),
+            'src_num_with_urls': number_of_tweets_with_urls(self.src_user, self.node_collection),
+            'event_is_positive': self.event_is_positive(self.src_user),
+            'event_is_negative': self.event_is_negative(self.src_user),
+            'event_is_directed': self.event_is_directed_to(self.src_user, self.dest_user),
+            'event_has_hashtags': self.event_has_hashtags(self.src_user),
+            'event_has_media': self.event_has_media(self.src_user),
+            'event_has_url': self.event_has_url(self.src_user),
+            'event_has_response': self.event_has_response(self.src_user, self.dest_user),
+            'event_response_time': self.event_response_time(self.src_user, self.dest_user)
         }
 
     def target_user_features(self):
@@ -769,12 +882,13 @@ class Features(object):
             {dict} -- mapping of feature names to values
         """
         return {
-            'src_num_directed_dest': self.src_num_directed_dest(),
-            'src_avg_positive_sentiment_directed_dest': self.src_avg_positive_sentiment_directed_dest(),
-            'src_avg_negative_sentiment_directed_dest': self.src_avg_negative_sentiment_directed_dest(),
-            'src_num_with_media': number_of_tweets_with_media(self.src_user, self.node_collection),
-            'src_num_with_hashtags': number_of_tweets_with_hashtags(self.src_user, self.node_collection),
-            'src_num_with_urls': number_of_tweets_with_urls(self.src_user, self.node_collection),
+            'dest_num_responses_to_src': self.dest_num_responses_to_src(),
+            'dest_num_responses_to_mentions': self.dest_num_responses_to_mentions(),
+            'dest_avg_positive_sentiment_responses': self.dest_avg_positive_sentiment_responses(),
+            'dest_avg_negative_sentiment_responses': self.dest_avg_negative_sentiment_responses(),
+            'dest_num_responses_to_media': self.dest_num_responses_to_media(),
+            'dest_num_responses_to_hashtags': self.dest_num_responses_to_hashtags(),
+            'dest_num_responses_to_urls': self.dest_num_responses_to_urls()
         }
 
     def to_dict(self):
@@ -842,6 +956,21 @@ def get_responses(user_id, node_collection, tweets_collection, retweets_collecti
     for tweet in expanded_tweets(attr['tweets'], tweets_collection):
         if tweet.is_response_tweet:
             yield tweet
+
+
+def get_event_tweet(user_id, tweets_collection):
+    """ Gets the event tweet (the earliest tweet sent by the user in this database) """
+    query = {'author_id': user_id}
+
+    min_tweet = None
+    for tweet in tweets_collection.find(query):
+        parsed = Tweet(tweet)
+        if min_tweet is None:
+            min_tweet = parsed
+        elif parsed.created_at < min_tweet.created_at:
+            min_tweet = parsed
+
+    return min_tweet
 
 
 def expanded_tweets(tweet_ids, tweets_collection):
