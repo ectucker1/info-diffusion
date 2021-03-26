@@ -4,15 +4,18 @@ import numpy as np
 import pandas as pd
 import progressbar
 
+from indiff.twitter import Tweet
+
 
 class Features(object):
     def __init__(self, src_user=None, dest_user=None, keywords=None,
-                 node_collection=None, tweet_collection=None, user=None):
+                 node_collection=None, tweet_collection=None, retweets_collection=None, user=None):
         self.src_user = src_user
         self.dest_user = dest_user
         self.keywords = keywords
         self.node_collection = node_collection
         self.tweet_collection = tweet_collection
+        self.retweets_collection=retweets_collection
         self.user = user
 
     def activity_index(self, user_id, e=30.4*24):
@@ -542,6 +545,78 @@ class Features(object):
         attr = self.node_collection.find_one(query)
         return attr['ratio_of_retweet_per_time_period']
 
+    def dest_num_responses_to_src(self):
+        """ Returns the number of responses (retweets, quotes, or replies) given from the target to the source user """
+        count = 0
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            if response.original_owner_id(self.tweet_collection) == self.src_user:
+                count += 1
+        return count
+
+    def dest_num_responses_to_mentions(self):
+        """ Returns the number of responses (retweets, quotes, or replies) given from the target when mentioned """
+        count = 0
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            if response.users_mentioned == self.dest_user:
+                count += 1
+        return count
+
+    def dest_avg_positive_sentiment_responses(self):
+        """ Computes the avg positive sentiment of the responses sent by the target """
+        num_responses = 0
+        num_positive = 0
+
+        # For each response
+        for tweet in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            num_responses += 1
+            # If that tweet is positive
+            if tweet.is_positive_sentiment:
+                num_positive += 1
+
+        if num_responses == 0:
+            return 0
+        return num_positive / num_responses
+
+    def dest_avg_negative_sentiment_responses(self):
+        """ Computes the avg negative sentiment of the responses sent by the target """
+        num_responses = 0
+        num_negative = 0
+
+        # For each response
+        for tweet in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            num_responses += 1
+            # If that tweet is negative
+            if tweet.is_negative_sentiment:
+                num_negative += 1
+
+        if num_responses == 0:
+            return 0
+        return num_negative / num_responses
+
+    def dest_num_responses_to_media(self):
+        """ Returns the number of responses (retweets, quotes, or replies) given from the target to tweets containing media """
+        count = 0
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            if response.media:
+                count += 1
+        return count
+
+    def dest_num_responses_to_hashtags(self):
+        """ Returns the number of responses (retweets, quotes, or replies) given from the target to tweets containing hashtags """
+        count = 0
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            if response.hashtags:
+                count += 1
+        return count
+
+    def dest_num_responses_to_urls(self):
+        """ Returns the number of responses (retweets, quotes, or replies) given from the target to tweets containing urls """
+        count = 0
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+            if response.urls:
+                count += 1
+        return count
+
     def additional_features(self, user_id, user=None):
         return {
             f'{user}_I': self.activity_index(user_id),
@@ -677,7 +752,13 @@ class Features(object):
             {dict} -- mapping of feature names to values
         """
         return {
-
+            'dest_num_responses_to_src': self.dest_num_responses_to_src(),
+            'dest_num_responses_to_mentions': self.dest_num_responses_to_mentions(),
+            'dest_avg_positive_sentiment_responses': self.dest_avg_positive_sentiment_responses(),
+            'dest_avg_negative_sentiment_responses': self.dest_avg_negative_sentiment_responses(),
+            'dest_num_responses_to_media': self.dest_num_responses_to_media(),
+            'dest_num_responses_to_hashtags': self.dest_num_responses_to_hashtags(),
+            'dest_num_responses_to_urls': self.dest_num_responses_to_urls()
         }
 
     def target_user_features(self):
@@ -743,6 +824,35 @@ def get_user_published_tweets(user_id, node_collection):
     return tweets + retweeted_tweets + quoted_tweets
 
 
+def get_responses(user_id, node_collection, tweets_collection, retweets_collection):
+    # Find cached user attributes
+    query = {'_id': user_id}
+    attr = node_collection.find_one(query)
+
+    # Find retweets in retweets collection
+    query = {'user.id_str': user_id}
+    for retweet in retweets_collection.find(query):
+        yield Tweet(retweet)
+
+    # For each quoted tweet
+    for quoted_tweets in expanded_tweets(attr['quoted_tweets'], tweets_collection):
+        yield quoted_tweets
+
+    # For each original tweet
+    for tweet in expanded_tweets(attr['tweets'], tweets_collection):
+        if tweet.is_response_tweet:
+            yield tweet
+
+
+def expanded_tweets(tweet_ids, tweets_collection):
+    """ Get tweets from the database using the given list of ids """
+    for id_str in tweet_ids:
+        query = {'id': id_str}
+        found = tweets_collection.find_one(query)
+        if found is not None:
+            yield Tweet(found)
+
+
 def users_ever_mentioned(user_id, node_collection):  # get_users_mentioned_in
     """notation 7"""
     query = {'_id': user_id}
@@ -771,7 +881,7 @@ def get_keywords_from_user_tweets(user_id, node_collection):
 
 
 def calculate_network_diffusion(edges, keywords, node_collection,
-                                tweet_collection, *, additional_attr=False,
+                                tweet_collection, retweets_collection, *, additional_attr=False,
                                 do_not_add_sentiment=False, n_days=30):
     # todo: turn this into a generator and see if its contents will only be
     # consumed once. this will require removing counter and search for another
@@ -784,7 +894,9 @@ def calculate_network_diffusion(edges, keywords, node_collection,
     bar = progressbar.ProgressBar(widgets=widgets)
     for src_user, dest_user in bar(edges):
         features = Features(src_user=src_user, dest_user=dest_user,
-                            keywords=keywords, node_collection=node_collection)
+                            keywords=keywords, node_collection=node_collection,
+                            tweet_collection=tweet_collection,
+                            retweets_collection=retweets_collection)
 
         yield(features.to_dict())
 

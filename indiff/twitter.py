@@ -167,6 +167,12 @@ class Tweet(object):
                     if tweet_:
                         return tweet_['author_id']
 
+        # For old tweet format
+        if 'retweeted_status' in self.tweet:
+            return self.tweet['retweeted_status']['user']['id_str']
+        if 'quoted_status' in self.tweet:
+            return self.tweet['quoted_status']['user']['id_str']
+
         if 'in_reply_to_user_id' in self.tweet:
             return self.tweet['in_reply_to_user_id']
 
