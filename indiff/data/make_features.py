@@ -323,6 +323,7 @@ def main(topic, keywords_filepath):
         tweet_collection = db[topic]
         user_attribs_collection = db[topic + "-user-attribs"]
         users_collection = db[topic + "-users"]
+        retweets_collection = db[topic + "-retweets"]
         tweet_mentions_collection = db[topic + "-mentions"]
 
         if db_name not in client.list_database_names():
