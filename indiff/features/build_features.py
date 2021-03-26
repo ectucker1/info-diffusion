@@ -115,6 +115,60 @@ class Features(object):
         else:
             return 1
 
+    def src_num_directed_dest(self):
+        """Computes the number of tweets directed from the source to target user"""
+        mentions = tweets_mentioned_in(self.dest_user, self.node_collection)
+
+        num_directed = 0
+
+        # For each tweet which mentions the target user
+        for tweet in mentions:
+            # If that tweet was sent by the src user
+            if tweet.owner_id == self.src_user:
+                num_directed += 1
+
+        return num_directed
+
+    def src_avg_positive_sentiment_directed_dest(self):
+        """Computes the avg positive sentiment of the tweets directed from the source to target user"""
+        mentions = tweets_mentioned_in(self.dest_user, self.node_collection)
+
+        num_directed = 0
+        num_positive = 0
+
+        # For each tweet which mentions the target user
+        for tweet in mentions:
+            # If that tweet was sent by the src user
+            if tweet.owner_id == self.src_user:
+                num_directed += 1
+                # If that tweet is positive
+                if tweet.is_positive_sentiment:
+                    num_positive += 1
+
+        if num_directed == 0:
+            return 0
+        return num_positive / num_directed
+
+    def src_avg_negative_sentiment_directed_dest(self):
+        """Computes the avg negative sentiment of the tweets directed from the source to target user"""
+        mentions = tweets_mentioned_in(self.dest_user, self.node_collection)
+
+        num_directed = 0
+        num_negative = 0
+
+        # For each tweet which mentions the target user
+        for tweet in mentions:
+            # If that tweet was sent by the src user
+            if tweet.owner_id == self.src_user:
+                num_directed += 1
+                # If that tweet is positive
+                if tweet.is_negative_sentiment:
+                    num_negative += 1
+
+        if num_directed == 0:
+            return 0
+        return num_negative / num_directed
+
     def hK(self, user_id):
         """Has the user tweeted about the given topic?
 
@@ -228,6 +282,12 @@ class Features(object):
 
         return avg
 
+    def total_number_of_tweets(self, user_id):
+        """The number of Tweets sent by the given user in the database"""
+        total_number_of_tweets = len(get_user_published_tweets(user_id, self.node_collection))
+
+        return total_number_of_tweets
+
     def avg_number_of_mentions_not_including_retweets(self, user_id):
         """ number 11 (new) """
         query = {'_id': user_id}
@@ -256,6 +316,14 @@ class Features(object):
 
         return avg
 
+    def raw_number_followers(self, user_id):
+        # Get the number of followers for the given user id
+        query = {'_id': user_id}
+        attr = self.node_collection.find_one(query)
+        n_followers = attr['followers_count']
+
+        return n_followers
+
     def avg_number_friends(self, user_id):
         """ number 13 (new) """
         query = {'_id': user_id}
@@ -269,6 +337,23 @@ class Features(object):
             avg = 1
 
         return avg
+
+    def raw_number_friends(self, user_id):
+        # Get the number of friends (following) for the given user
+        query = {'_id': user_id}
+        attr = self.node_collection.find_one(query)
+        n_friends = attr['friends_count']
+
+        return n_friends
+
+    def follower_friends_ratio(self, user_id):
+        # Get the ratio of the number of followers a user has to the number of friends
+        num_followers = self.raw_number_followers(user_id)
+        num_friends = self.raw_number_friends(user_id)
+
+        if num_friends == 0:
+            return 0
+        return  num_followers / num_friends
 
     def avg_number_of_mentions(self):
         """ number 14 (new) """
@@ -562,24 +647,80 @@ class Features(object):
                 self.ratio_of_follower_to_friends(user_id),
             }
 
-    def to_dict(self):
-        default_features = {
-             # NB: The src_id and dest_id features are not in the range 0-1, and should probably not actually be input to a model
-            'src_id': self.src_user,
-            'dest_id': self.dest_user,
-            'H': self.h(),
-            'hM': self.hM(),
-            'y': self.y(),
+    def generic_user_features(self, user_id, user=None):
+        """Creates a dictionary of features which apply to both the source and target.
+        Part of the model for Adaeze's project.
+
+        Arguments:
+            user_id {str} -- User ID
+
+        Keyword Arguments:
+            user {str} -- Name used to prefix users in the returned dictionary
+
+        Returns:
+            {dict} -- mapping of feature names to values
+        """
+        return {
+            f'{user}_num_followers': self.raw_number_followers(user_id),
+            f'{user}_num_friends': self.raw_number_friends(user_id),
+            f'{user}_follower_friends_ratio': self.follower_friends_ratio(user_id),
+            f'{user}_total_tweets': self.total_number_of_tweets(user_id),
+            f'{user}_avg_positive_sentiment_of_tweets': self.avg_positive_sentiment_of_tweets(user_id),
+            f'{user}_avg_negative_sentiment_of_tweets': self.avg_negative_sentiment_of_tweets(user_id)
         }
 
-        src_additional_features = self.additional_features(
-            user_id=self.src_user, user='src')
+    def src_user_features(self):
+        """Creates a dictionary of features which apply only to the source user.
+        Part of the model for Adaeze's project.
 
-        dest_additional_features = self.additional_features(
-            user_id=self.dest_user, user='dest')
+        Returns:
+            {dict} -- mapping of feature names to values
+        """
+        return {
 
-        return ChainMap(default_features, src_additional_features,
-                        dest_additional_features)
+        }
+
+    def target_user_features(self):
+        """Creates a dictionary of features which apply only to the target.
+        Part of the model for Adaeze's project.
+
+        Returns:
+            {dict} -- mapping of feature names to values
+        """
+        return {
+            'src_num_directed_dest': self.src_num_directed_dest(),
+            'src_avg_positive_sentiment_directed_dest': self.src_avg_positive_sentiment_directed_dest(),
+            'src_avg_negative_sentiment_directed_dest': self.src_avg_negative_sentiment_directed_dest(),
+            'src_num_with_media': number_of_tweets_with_media(self.src_user, self.node_collection),
+            'src_num_with_hashtags': number_of_tweets_with_hashtags(self.src_user, self.node_collection),
+            'src_num_with_urls': number_of_tweets_with_urls(self.src_user, self.node_collection),
+        }
+
+    def to_dict(self):
+        """Calculates all features for the current pair of src and destination.
+        Currently setup for the model for Adaeze's project.
+
+        Returns:
+            {dict} -- mapping of feature names to values
+        """
+        default_features = {
+            # NB: The src_id and dest_id features are not in the range 0-1, and should probably not actually be input to a model
+            'src_id': self.src_user,
+            'dest_id': self.dest_user
+        }
+
+        # Calculate features common to both the source and target users
+        src_generic_features = self.generic_user_features(user_id=self.src_user, user='src')
+        dest_generic_features = self.generic_user_features(user_id=self.dest_user, user='dest')
+
+        # Calculate features specific to the source user
+        src_features = self.src_user_features()
+
+        # Calculate features specific to the target user
+        dest_features = self.target_user_features()
+
+        return ChainMap(default_features, src_generic_features, src_features,
+                        dest_generic_features, dest_features)
 
 
 def get_user_published_tweets(user_id, node_collection):

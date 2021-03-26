@@ -109,6 +109,9 @@ def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_coll
             # fetch tweet dates
             user_attribs['tweets_dates'].append(tweet.created_at)
 
+        if tweet.is_response_tweet:
+            user_attribs['responses'].append(tweet.id)
+
         if tweet.is_favourited:
             user_attribs['favorite_tweets_count'] += 1
 
@@ -199,6 +202,7 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
                         'tweets_dates': [],
                         'retweeted_tweets_dates': [],
                         'quoted_tweets_dates': [],
+                        'responses': []
                         }
 
         query = {"author_id": user_id}

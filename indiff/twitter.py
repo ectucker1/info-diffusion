@@ -109,9 +109,9 @@ class Tweet(object):
         if not entities:
             return entities
 
-        users_mentions = entities.get('user_mentions', [])
+        users_mentions = entities.get('mentions', [])
         if not users_mentions:
-            return users_mentions
+            return [mention['username'] for mention in users_mentions]
 
     @property
     def owner_description(self):
@@ -201,6 +201,21 @@ class Tweet(object):
         return False
 
     @property
+    def is_response_tweet(self):
+        """ Determines whther this tweet is a response (retweet, quote, or reply) """
+
+        if self.is_retweeted_tweet:
+            return True
+
+        if self.is_quoted_tweet:
+            return True
+
+        if 'in_reply_to_user_id' in self.tweet:
+            return True
+
+        return False
+
+    @property
     def hashtags(self):
         """[summary]
 
@@ -214,7 +229,7 @@ class Tweet(object):
 
         hashtags = entities.get('hashtags', [])
 
-        return hashtags
+        return [hashtag['tag'] for hashtag in hashtags]
 
     @property
     def urls(self):
@@ -298,6 +313,18 @@ class Tweet(object):
 
         d = sentiment(self.text)
         return True if d == 'positive' else False
+
+    @property
+    def is_negative_sentiment(self):
+        """[summary]
+
+        Returns:
+            [type] -- [description]
+        """
+
+        d = sentiment(self.text)
+        return True if d == 'negative' else False
+
 
     @property
     def owner_followers_count(self):
