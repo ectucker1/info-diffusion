@@ -310,7 +310,8 @@ def main(topic, keywords_filepath):
     raw_data_root_dir = os.path.join(data_root_dir, 'raw')
     topic_raw_data_dir = os.path.join(raw_data_root_dir, topic)
 
-    db_name = "info-diffusion"
+    db_name = "RPE_twitteranniv"
+    event_db_name = "RPE_twitteranniv"
     client = None
 
     try:
@@ -320,11 +321,13 @@ def main(topic, keywords_filepath):
         client = pymongo.MongoClient(host='localhost', port=27017,
                                      appname=__file__)
         db = client[db_name]
+        event_db = client[event_db_name]
         tweet_collection = db[topic]
         user_attribs_collection = db[topic + "-user-attribs"]
         users_collection = db[topic + "-users"]
         retweets_collection = db[topic + "-retweets"]
         tweet_mentions_collection = db[topic + "-mentions"]
+        event_tweets_collection = event_db[topic + "-event_tweets"]
 
         if db_name not in client.list_database_names():
             raise ValueError(f"Database does not exist: {db_name}.")
@@ -375,6 +378,7 @@ def main(topic, keywords_filepath):
             node_collection=user_attribs_collection,
             tweet_collection=tweet_collection,
             retweets_collection=retweets_collection,
+            event_tweets_collection=event_tweets_collection,
             additional_attr=True,
             do_not_add_sentiment=False
             )

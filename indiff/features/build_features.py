@@ -9,13 +9,15 @@ from indiff.twitter import Tweet
 
 class Features(object):
     def __init__(self, src_user=None, dest_user=None, keywords=None,
-                 node_collection=None, tweet_collection=None, retweets_collection=None, user=None):
+                 node_collection=None, tweet_collection=None, retweets_collection=None, event_tweets_collection=None,
+                 user=None):
         self.src_user = src_user
         self.dest_user = dest_user
         self.keywords = keywords
         self.node_collection = node_collection
         self.tweet_collection = tweet_collection
         self.retweets_collection=retweets_collection
+        self.event_tweets_collection=event_tweets_collection
         self.user = user
 
     def activity_index(self, user_id, e=30.4*24):
@@ -619,7 +621,7 @@ class Features(object):
 
     def event_is_positive(self, user_id):
         """ Returns 1 if the event tweet for the given user is positive, 0 otherwise """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -631,7 +633,7 @@ class Features(object):
 
     def event_is_negative(self, user_id):
         """ Returns 1 if the event tweet for the given user is negative, 0 otherwise """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -643,7 +645,7 @@ class Features(object):
 
     def event_is_directed_to(self, src_id, target_id):
         """ Returns 1 if the event tweet for the given user is directed to the target """
-        event = get_event_tweet(src_id, self.tweet_collection)
+        event = get_event_tweet(src_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -656,7 +658,7 @@ class Features(object):
 
     def event_has_hashtags(self, user_id):
         """ Returns 1 if the event tweet for the given user has a hashtag """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -668,7 +670,7 @@ class Features(object):
 
     def event_has_media(self, user_id):
         """ Returns 1 if the event tweet for the given user has media """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -680,7 +682,7 @@ class Features(object):
 
     def event_has_url(self, user_id):
         """ Returns 1 if the event tweet for the given user has media """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -692,7 +694,7 @@ class Features(object):
 
     def event_has_response(self, user_id, responder_id):
         """ Returns 1 if the event tweet for the given user has a response, false otherwise """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -706,7 +708,7 @@ class Features(object):
 
     def event_response_time(self, user_id, responder_id):
         """ Returns 1 if the event tweet for the given user has a response, false otherwise """
-        event = get_event_tweet(user_id, self.tweet_collection)
+        event = get_event_tweet(user_id, self.event_tweets_collection)
 
         if event is None:
             return 0
@@ -958,12 +960,12 @@ def get_responses(user_id, node_collection, tweets_collection, retweets_collecti
             yield tweet
 
 
-def get_event_tweet(user_id, tweets_collection):
+def get_event_tweet(user_id, event_tweets_collection):
     """ Gets the event tweet (the earliest tweet sent by the user in this database) """
     query = {'author_id': user_id}
 
     min_tweet = None
-    for tweet in tweets_collection.find(query):
+    for tweet in event_tweets_collection.find(query):
         parsed = Tweet(tweet)
         if min_tweet is None:
             min_tweet = parsed
@@ -1010,7 +1012,8 @@ def get_keywords_from_user_tweets(user_id, node_collection):
 
 
 def calculate_network_diffusion(edges, keywords, node_collection,
-                                tweet_collection, retweets_collection, *, additional_attr=False,
+                                tweet_collection, retweets_collection, event_tweets_collection,
+                                *, additional_attr=False,
                                 do_not_add_sentiment=False, n_days=30):
     # todo: turn this into a generator and see if its contents will only be
     # consumed once. this will require removing counter and search for another
@@ -1025,7 +1028,8 @@ def calculate_network_diffusion(edges, keywords, node_collection,
         features = Features(src_user=src_user, dest_user=dest_user,
                             keywords=keywords, node_collection=node_collection,
                             tweet_collection=tweet_collection,
-                            retweets_collection=retweets_collection)
+                            retweets_collection=retweets_collection,
+                            event_tweets_collection=event_tweets_collection)
 
         yield(features.to_dict())
 
