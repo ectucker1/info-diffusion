@@ -343,6 +343,12 @@ def main(topic, keywords_filepath):
     except (ValueError, FileNotFoundError, FileExistsError, KeyError) as error:
         logger.error(error)
     else:
+        # Remove all nodes without users in the database
+        for user in list(social_network.nodes):
+            if not users_collection.find_one({'id': user}):
+                social_network.remove_node(user)
+                print('Removed nonexistent user ', user)
+
         social_network.name = topic
 
         # reports file path
