@@ -154,20 +154,30 @@ class Tweet(object):
         """
 
         if self.is_retweeted_tweet:
-            for referenced in self.tweet['referenced_tweets']:
-                if referenced['type'] == 'retweeted':
-                    # TODO Expand data collection to find these
-                    tweet_ = tweet_collection.find_one({"id": referenced['id']})
-                    if tweet_:
-                        return tweet_['author_id']
+            if 'referenced_tweets' in self.tweet:
+                # Wrap in try in case of weird formatting
+                try:
+                    for referenced in self.tweet['referenced_tweets']:
+                        if referenced['type'] == 'retweeted':
+                            # TODO Expand data collection to find these
+                            tweet_ = tweet_collection.find_one({"id": referenced['id']})
+                            if tweet_:
+                                return tweet_['author_id']
+                except TypeError:
+                    pass
 
         if self.is_quoted_tweet:
-            for referenced in self.tweet['referenced_tweets']:
-                if referenced['type'] == 'quoted':
-                    # TODO Expand data collection to find thse
-                    tweet_ = tweet_collection.find_one({"id": referenced['id']})
-                    if tweet_:
-                        return tweet_['author_id']
+            if 'referenced_tweets' in self.tweet:
+                # Wrap in try in case of weird formatting
+                try:
+                    for referenced in self.tweet['referenced_tweets']:
+                        if referenced['type'] == 'quoted':
+                            # TODO Expand data collection to find thse
+                            tweet_ = tweet_collection.find_one({"id": referenced['id']})
+                            if tweet_:
+                                return tweet_['author_id']
+                except TypeError:
+                    pass
 
         # For old tweet format
         if 'retweeted_status' in self.tweet:
@@ -184,13 +194,18 @@ class Tweet(object):
     def original_tweet_id(self):
         """ Returns the original id this tweet is in response to """
 
-        for referenced in self.tweet['referenced_tweets']:
-            if referenced['type'] == 'retweeted':
-                return referenced['id']
-            if referenced['type'] == 'quoted':
-                return referenced['id']
-            if referenced['type'] == 'replied_to':
-                return referenced['id']
+        # Wrap in try in case of weird formatting
+        try:
+            if 'referenced_tweets' in self.tweet:
+                for referenced in self.tweet['referenced_tweets']:
+                    if referenced['type'] == 'retweeted':
+                        return referenced['id']
+                    if referenced['type'] == 'quoted':
+                        return referenced['id']
+                    if referenced['type'] == 'replied_to':
+                        return referenced['id']
+        except TypeError:
+            pass
 
         # For old tweet format
         if 'retweeted_status' in self.tweet:
@@ -209,9 +224,13 @@ class Tweet(object):
         """
 
         if 'referenced_tweets' in self.tweet:
-            for referenced in self.tweet['referenced_tweets']:
-                if referenced['type'] == 'retweeted':
-                    return True
+            # Wrap in try in case of weird formatting
+            try:
+                for referenced in self.tweet['referenced_tweets']:
+                    if referenced['type'] == 'retweeted':
+                        return True
+            except TypeError:
+                pass
         return False
 
     @property
@@ -223,9 +242,13 @@ class Tweet(object):
         """
 
         if 'referenced_tweets' in self.tweet:
-            for referenced in self.tweet['referenced_tweets']:
-                if referenced['type'] == 'quoted':
-                    return True
+            # Wrap in try in case of weird formatting
+            try:
+                for referenced in self.tweet['referenced_tweets']:
+                    if referenced['type'] == 'quoted':
+                        return True
+            except TypeError:
+                pass
         return False
 
     @property
