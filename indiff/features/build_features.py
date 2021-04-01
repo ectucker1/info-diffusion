@@ -127,7 +127,7 @@ class Features(object):
         num_directed = 0
 
         # For each tweet which mentions the target user
-        for tweet in mentions:
+        for tweet in expanded_tweets(mentions, self.tweet_collection):
             # If that tweet was sent by the src user
             if tweet.owner_id == self.src_user:
                 num_directed += 1
@@ -142,7 +142,7 @@ class Features(object):
         num_positive = 0
 
         # For each tweet which mentions the target user
-        for tweet in mentions:
+        for tweet in expanded_tweets(mentions, self.tweet_collection):
             # If that tweet was sent by the src user
             if tweet.owner_id == self.src_user:
                 num_directed += 1
@@ -162,7 +162,7 @@ class Features(object):
         num_negative = 0
 
         # For each tweet which mentions the target user
-        for tweet in mentions:
+        for tweet in expanded_tweets(mentions, self.tweet_collection):
             # If that tweet was sent by the src user
             if tweet.owner_id == self.src_user:
                 num_directed += 1

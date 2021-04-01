@@ -30,6 +30,8 @@ def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_coll
 
     user = users_collection.find_one({'id': user_id})
 
+    user_attribs['username'] = user['username']
+
     if not user_attribs['followers_count']:
         user_attribs['followers_count'] = user['public_metrics']['followers_count']
 
@@ -163,10 +165,14 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
     """
     n_user_ids = len(users)
 
+    # Create an index so that user mentions will be efficent
+    user_attribs_collection.create_index('username')
+
     for i, user_id in zip(count(start=1), users):
         logging.info(f"PROCESSING NODE ATTR FOR {user_id}: "
                      f"{i} OF {n_user_ids} USERS")
         user_attribs = {'_id': user_id,
+                        'username': '',
                         'tweets': [],
                         'n_tweets_with_hashtags': 0,
                         'n_tweets_with_urls': 0,
@@ -277,7 +283,7 @@ def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
 
             for user in users_mentioned:
                 # check if user exists in user_attribs_collection
-                query_user_attr = {"_id": user}
+                query_user_attr = {'username': user}
                 document_count = user_attribs_collection.count_documents(
                     query_user_attr)
                 if document_count:

@@ -110,8 +110,8 @@ class Tweet(object):
             return []
 
         users_mentions = entities.get('mentions', [])
-        if not users_mentions:
-            return [mention['username'] for mention in users_mentions]
+        if users_mentions:
+            return list([mention['username'] for mention in users_mentions])
 
         return []
 
@@ -342,7 +342,7 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return True if self.users_mentioned else False
+        return True if len(self.users_mentioned) > 0 else False
 
     @property
     def is_favourited(self):
