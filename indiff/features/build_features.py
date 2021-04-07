@@ -10,7 +10,7 @@ from indiff.twitter import Tweet
 class Features(object):
     def __init__(self, src_user=None, dest_user=None, keywords=None,
                  node_collection=None, tweet_collection=None, retweets_collection=None, event_tweets_collection=None,
-                 user=None):
+                 users_collection=None, user=None):
         self.src_user = src_user
         self.dest_user = dest_user
         self.keywords = keywords
@@ -18,6 +18,7 @@ class Features(object):
         self.tweet_collection = tweet_collection
         self.retweets_collection=retweets_collection
         self.event_tweets_collection=event_tweets_collection
+        self.users_collection=users_collection
         self.user = user
 
     def activity_index(self, user_id, e=30.4*24):
@@ -619,6 +620,14 @@ class Features(object):
                 count += 1
         return count
 
+    def dest_follows_src(self):
+        """ Returns 1 if the target user follows the source, 0 otherwise """
+        for id in get_following(self.dest_user, self.users_collection):
+            if id == self.src_user:
+                return 1
+
+        return 0
+
     def event_is_positive(self, user_id):
         """ Returns 1 if the event tweet for the given user is positive, 0 otherwise """
         event = get_event_tweet(user_id, self.event_tweets_collection)
@@ -890,7 +899,8 @@ class Features(object):
             'dest_avg_negative_sentiment_responses': self.dest_avg_negative_sentiment_responses(),
             'dest_num_responses_to_media': self.dest_num_responses_to_media(),
             'dest_num_responses_to_hashtags': self.dest_num_responses_to_hashtags(),
-            'dest_num_responses_to_urls': self.dest_num_responses_to_urls()
+            'dest_num_responses_to_urls': self.dest_num_responses_to_urls(),
+            'dest_follows_src': self.dest_follows_src()
         }
 
     def to_dict(self):
@@ -975,6 +985,18 @@ def get_event_tweet(user_id, event_tweets_collection):
     return min_tweet
 
 
+def get_following(user_id, users_collection):
+    """ Gets list of users the given user is following """
+    query = {'id': user_id}
+
+    user = users_collection.find_one(query)
+    if 'following' in user:
+        return user['following']
+
+    # No following data; return empty list
+    return []
+
+
 def expanded_tweets(tweet_ids, tweets_collection):
     """ Get tweets from the database using the given list of ids """
     for id_str in tweet_ids:
@@ -1012,7 +1034,7 @@ def get_keywords_from_user_tweets(user_id, node_collection):
 
 
 def calculate_network_diffusion(edges, keywords, node_collection,
-                                tweet_collection, retweets_collection, event_tweets_collection,
+                                tweet_collection, retweets_collection, event_tweets_collection, users_collection,
                                 *, additional_attr=False,
                                 do_not_add_sentiment=False, n_days=30):
     # todo: turn this into a generator and see if its contents will only be
@@ -1029,6 +1051,7 @@ def calculate_network_diffusion(edges, keywords, node_collection,
                             keywords=keywords, node_collection=node_collection,
                             tweet_collection=tweet_collection,
                             retweets_collection=retweets_collection,
+                            users_collection=users_collection,
                             event_tweets_collection=event_tweets_collection)
 
         yield(features.to_dict())

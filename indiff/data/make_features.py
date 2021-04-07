@@ -388,6 +388,7 @@ def main(topic, keywords_filepath):
             tweet_collection=tweet_collection,
             retweets_collection=retweets_collection,
             event_tweets_collection=event_tweets_collection,
+            users_collection=users_collection,
             additional_attr=True,
             do_not_add_sentiment=False
             )
