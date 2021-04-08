@@ -32,11 +32,20 @@ def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_coll
 
     user_attribs['username'] = user['username']
 
-    if not user_attribs['followers_count']:
-        user_attribs['followers_count'] = user['public_metrics']['followers_count']
+    # Get metrics for new user format
+    if 'public_metrics' in user:
+        if not user_attribs['followers_count']:
+            user_attribs['followers_count'] = user['public_metrics']['followers_count']
 
-    if not user_attribs['friends_count']:
-        user_attribs['friends_count'] = user['public_metrics']['following_count']
+        if not user_attribs['friends_count']:
+            user_attribs['friends_count'] = user['public_metrics']['following_count']
+    # Get metrics for old user format
+    else:
+        if not user_attribs['followers_count']:
+            user_attribs['followers_count'] = user['followers_count']
+
+        if not user_attribs['friends_count']:
+            user_attribs['friends_count'] = user['following_count']
 
     if not user_attribs['description']:
         user_attribs['description'] = user['description']
