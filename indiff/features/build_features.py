@@ -990,7 +990,9 @@ def get_following(user_id, users_collection):
     query = {'id': user_id}
 
     user = users_collection.find_one(query)
-    if 'following' in user:
+    if 'following_ids' in user:
+        return user['following_ids']
+    elif 'following' in user:
         return user['following']
 
     # No following data; return empty list
