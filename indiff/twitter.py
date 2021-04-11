@@ -280,7 +280,15 @@ class Tweet(object):
 
         hashtags = entities.get('hashtags', [])
 
-        return [hashtag['tag'] for hashtag in hashtags]
+        text_tags = []
+        for hashtag in hashtags:
+            # Might be two different property names, for some reason
+            if 'tag' in hashtag:
+                text_tags.append(hashtag['tag'])
+            elif 'text' in hashtag:
+                text_tags.append(hashtag['text'])
+
+        return text_tags
 
     @property
     def urls(self):

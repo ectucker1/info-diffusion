@@ -10,6 +10,7 @@ import networkx as nx
 import pandas as pd
 import progressbar
 import pymongo
+import json
 from dotenv import find_dotenv, load_dotenv
 
 from indiff import utils
@@ -34,11 +35,16 @@ def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_coll
 
     # Get metrics for new user format
     if 'public_metrics' in user:
+        metrics = user['public_metrics']
+        # Metrics are stored as a JSON string sometimes?
+        if isinstance(metrics, str):
+            metrics = json.loads(metrics.replace('\'', '\"'))
+
         if not user_attribs['followers_count']:
-            user_attribs['followers_count'] = user['public_metrics']['followers_count']
+            user_attribs['followers_count'] = metrics['followers_count']
 
         if not user_attribs['friends_count']:
-            user_attribs['friends_count'] = user['public_metrics']['following_count']
+            user_attribs['friends_count'] = metrics['following_count']
     # Get metrics for old user format
     else:
         if not user_attribs['followers_count']:
