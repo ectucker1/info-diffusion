@@ -5,6 +5,7 @@ from itertools import count
 import progressbar
 import tweepy
 from pymongo.errors import DuplicateKeyError
+import json
 
 from indiff.utils import sentiment, split_text
 
@@ -108,6 +109,10 @@ class Tweet(object):
         entities = self.tweet.get('entities', {})
         if not entities:
             return []
+
+        # Entities are stored as a JSON string for event tweets
+        if isinstance(entities, str):
+            entities = json.loads(entities.replace('\'', '\"'))
 
         users_mentions = entities.get('mentions', [])
         if users_mentions:
@@ -330,7 +335,13 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return self.tweet['public_metrics']['retweet_count']
+        metrics = self.tweet['public_metrics']
+
+        # Metrics are stored as a JSON string for event tweets
+        if isinstance(metrics, str):
+            metrics = json.loads(metrics.replace('\'', '\"'))
+
+        return metrics['retweet_count']
 
     @property
     def is_retweeted(self):
@@ -360,7 +371,13 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return True if self.tweet['public_metrics']['like_count'] else False
+        metrics = self.tweet['public_metrics']
+
+        # Metrics are stored as a JSON string for event tweets
+        if isinstance(metrics, str):
+            metrics = json.loads(metrics.replace('\'', '\"'))
+
+        return True if metrics['like_count'] else False
 
     @property
     def is_positive_sentiment(self):
