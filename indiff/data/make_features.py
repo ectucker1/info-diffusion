@@ -290,7 +290,7 @@ def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
     if n_tweets:
         logging.info('update user attribs with tweets mentioned in')
 
-        tweets = tweet_mentions_collection.find({})
+        tweets = tweet_mentions_collection.find({}, no_cursor_timeout=True)
         bar = progressbar.ProgressBar(maxlen=n_tweets)
         for tweet_document in bar(tweets):
             tweet_id = tweet_document['_id']
@@ -314,6 +314,9 @@ def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
 
                     user_attribs_collection.update_one(
                         query_user_attr, new_values)
+        
+        # Close the database cursor
+        tweets.close()
 
 
 @click.command()
@@ -331,8 +334,8 @@ def main(topic, keywords_filepath):
     raw_data_root_dir = os.path.join(data_root_dir, 'raw')
     topic_raw_data_dir = os.path.join(raw_data_root_dir, topic)
 
-    db_name = "RPE_twitteranniv"
-    event_db_name = "RPE_twitteranniv"
+    db_name = "RPE_twitteranniv3"
+    event_db_name = "RPE_twitteranniv3"
     client = None
 
     try:
