@@ -732,7 +732,7 @@ class Features(object):
         if found_response is None:
             return 0
         else:
-            return (found_response.created_at - event.created_at).total_seconds()
+            return (found_response.created_at.replace(tzinfo=None) - event.created_at.replace(tzinfo=None)).total_seconds()
 
     def additional_features(self, user_id, user=None):
         return {

@@ -81,7 +81,16 @@ class Tweet(object):
         date = self.tweet['created_at']
         if isinstance(date, datetime.datetime):
             return date
-        return datetime.datetime.strptime(str(date), "%a %b %d %H:%M:%S %z %Y")
+
+        try:
+            return datetime.datetime.strptime(str(date), "%a %b %d %H:%M:%S %z %Y")
+        except:
+            pass
+
+        try:
+            return datetime.datetime.strptime(str(date), "%Y-%m-%d %H:%M:%S")
+        except:
+            pass
 
     @property
     def keywords(self):
@@ -283,6 +292,9 @@ class Tweet(object):
         if not entities:
             return entities
 
+        if isinstance(entities, str):
+            entities = json.loads(entities.replace('\'', '\"'))
+
         hashtags = entities.get('hashtags', [])
 
         text_tags = []
@@ -307,6 +319,9 @@ class Tweet(object):
         if not entities:
             return entities
 
+        if isinstance(entities, str):
+            entities = json.loads(entities.replace('\'', '\"'))
+
         urls = entities.get('urls', [])
 
         return urls
@@ -322,6 +337,9 @@ class Tweet(object):
         attachments = self.tweet.get('attachments', {})
         if not attachments:
             return attachments
+
+        if isinstance(attachments, str):
+            attachments = json.loads(attachments.replace('\'', '\"'))
 
         media = attachments.get('media_keys', [])
 

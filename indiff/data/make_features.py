@@ -180,6 +180,7 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
     """
     n_user_ids = len(users)
 
+
     # Create an index so that user mentions will be efficent
     user_attribs_collection.create_index('username')
 
@@ -314,7 +315,7 @@ def compute_mentioned_in(tweet_mentions_collection, user_attribs_collection):
 
                     user_attribs_collection.update_one(
                         query_user_attr, new_values)
-        
+
         # Close the database cursor
         tweets.close()
 
@@ -334,8 +335,8 @@ def main(topic, keywords_filepath):
     raw_data_root_dir = os.path.join(data_root_dir, 'raw')
     topic_raw_data_dir = os.path.join(raw_data_root_dir, topic)
 
-    db_name = "RPE_twitteranniv3"
-    event_db_name = "RPE_twitteranniv3"
+    db_name = "RPE_twitteranniv"
+    event_db_name = "RPE_twitteranniv"
     client = None
 
     try:
