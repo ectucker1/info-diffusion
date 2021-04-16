@@ -381,7 +381,7 @@ def main(topic, keywords_filepath):
                 social_network.remove_node(user)
 
         # print('Saving filtered adjacency list')
-        # nx.write_adjlist(social_network, social_network_filepath)
+        # nx.write_adjlist(social_network, social_network_filepath, delimiter=',')
 
         social_network.name = topic
 
@@ -403,49 +403,67 @@ def main(topic, keywords_filepath):
             )
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
-        # prepare table for dataframe
-        results = build_features.calculate_network_diffusion(
-            nx.edges(social_network), keywords,
-            node_collection=user_attribs_collection,
-            tweet_collection=tweet_collection,
-            retweets_collection=retweets_collection,
-            event_tweets_collection=event_tweets_collection,
-            users_collection=users_collection,
-            additional_attr=True,
-            do_not_add_sentiment=False
-            )
+        # Split the edges into sections to allow partial processing
+        edge_chunks = list(chunks(nx.edges(social_network), 5000))
+        print('Split edges into ', len(edge_chunks), ' sections')
 
-        df = pd.DataFrame(results)
+        # For each chunk of edges
+        for num, edges in enumerate(edge_chunks, start=1):
+            # create indexed name for dataset file
+            dataset_file = 'dataset' + str(num) + '.h5'
+            raw_dataset_dir = topic_raw_data_dir.parent
+            processed_saveas = os.path.join(raw_dataset_dir, dataset_file)
 
-        # save processed dataset to hdf file
-        key = utils.generate_random_id(15)
+            # if that file does not exist
+            if not os.path.exists(processed_saveas):
+                # prepare table for dataframe
+                results = build_features.calculate_network_diffusion(
+                    edges, keywords,
+                    node_collection=user_attribs_collection,
+                    tweet_collection=tweet_collection,
+                    retweets_collection=retweets_collection,
+                    event_tweets_collection=event_tweets_collection,
+                    users_collection=users_collection,
+                    additional_attr=True,
+                    do_not_add_sentiment=False
+                    )
 
-        # save features to a centralised raw directory
-        raw_dataset_dir = topic_raw_data_dir.parent
-        processed_saveas = os.path.join(raw_dataset_dir, 'dataset.h5')
-        logger.info(f'saving computed features to "{processed_saveas}"')
-        df.to_hdf(processed_saveas, key=key)
+                df = pd.DataFrame(results)
 
-        # save key to reports directory
-        if not os.path.exists(topic_reports_dir):
-            os.makedirs(topic_reports_dir)
-        key_saveas = os.path.join(topic_reports_dir.parent, 'dataset.keys')
-        logger.info(f'saving dataset key to "{key_saveas}"')
+                # save processed dataset to hdf file
+                key = utils.generate_random_id(15)
 
-        mode = 'a'
-        if not os.path.exists(key_saveas):
-            mode = 'w'
+                # save features to a centralised raw directory
+                logger.info(f'saving computed features to "{processed_saveas}"')
+                df.to_hdf(processed_saveas, key=key)
 
-        with open(key_saveas, mode) as f:
-            f.write('\n***\n\nmake_dataset.py '
-                    f'started at {current_date_and_time}')
-            f.write(f'\nNetwork path: {topic_raw_data_dir}')
-            f.write(f'\nTopic: {topic}')
-            f.write(f'\nKey: {key}\n\n')
+                # save key to reports directory
+                if not os.path.exists(topic_reports_dir):
+                    os.makedirs(topic_reports_dir)
+                key_saveas = os.path.join(topic_reports_dir.parent, 'dataset.keys')
+                logger.info(f'saving dataset key to "{key_saveas}"')
+
+                mode = 'a'
+                if not os.path.exists(key_saveas):
+                    mode = 'w'
+
+                with open(key_saveas, mode) as f:
+                    f.write('\n***\n\nmake_dataset.py '
+                            f'started at {current_date_and_time}')
+                    f.write(f'\nNetwork path: {topic_raw_data_dir}')
+                    f.write(f'\nTopic: {topic}')
+                    f.write(f'\nKey: {key}\n\n')
     finally:
         if client is not None:
             logger.info('ending all server sessions')
             client.close()
+
+
+# Split a list into chunks of size n
+def chunks(l, n):
+    l = list(l)
+    for i in range(0, len(l), n):
+        yield l[i:i+n]
 
 
 if __name__ == '__main__':
