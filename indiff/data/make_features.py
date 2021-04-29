@@ -351,6 +351,7 @@ def main(topic, keywords_filepath):
         user_attribs_collection = db[topic + "-user-attribs"]
         users_collection = db[topic + "-users"]
         retweets_collection = db[topic + "-retweets"]
+        replies_collection = db[topic + "-replies"]
         tweet_mentions_collection = db[topic + "-mentions"]
         event_tweets_collection = event_db[topic + "-event_tweets"]
 
@@ -396,11 +397,11 @@ def main(topic, keywords_filepath):
         # initialise node attributes to have desired info from dataset
         user_ids = nx.nodes(social_network)
         process_user_attribs(
-            users=user_ids, tweet_collection=tweet_collection,
-            tweet_mentions_collection=tweet_mentions_collection,
-            users_collection=users_collection,
-            user_attribs_collection=user_attribs_collection
-            )
+             users=user_ids, tweet_collection=tweet_collection,
+             tweet_mentions_collection=tweet_mentions_collection,
+             users_collection=users_collection,
+             user_attribs_collection=user_attribs_collection
+             )
         keywords = utils.get_keywords_from_file(keywords_filepath)
 
         # Split the edges into sections to allow partial processing
@@ -422,6 +423,7 @@ def main(topic, keywords_filepath):
                     node_collection=user_attribs_collection,
                     tweet_collection=tweet_collection,
                     retweets_collection=retweets_collection,
+                    replies_collection=replies_collection,
                     event_tweets_collection=event_tweets_collection,
                     users_collection=users_collection,
                     additional_attr=True,

@@ -16,6 +16,7 @@ def main():
     tweet_collection = db[topic]
     users_collection = db[topic + "-users"]
     retweets_collection = db[topic + "-retweets"]
+    replies_collection = db[topic + "-replies"]
     event_tweets_collection = event_db[topic + "-event_tweets"]
 
     # Create indices for tweets collection
@@ -32,6 +33,12 @@ def main():
     print("Creating indices for retweets collection")
     retweets_collection.create_index("id_str")
     retweets_collection.create_index("user.id_str")
+
+    # Create indices for replies collection
+    print("Creating indices for replies collection")
+    replies_collection.create_index("author_id")
+    replies_collection.create_index("user.id_str")
+
 
     # Create indices for event tweets collection
     print("Creating indices for event tweets collection")

@@ -10,13 +10,14 @@ from indiff.twitter import Tweet
 class Features(object):
     def __init__(self, src_user=None, dest_user=None, keywords=None,
                  node_collection=None, tweet_collection=None, retweets_collection=None, event_tweets_collection=None,
-                 users_collection=None, user=None):
+                 users_collection=None, user=None, replies_collection=None):
         self.src_user = src_user
         self.dest_user = dest_user
         self.keywords = keywords
         self.node_collection = node_collection
         self.tweet_collection = tweet_collection
         self.retweets_collection=retweets_collection
+        self.replies_collection=replies_collection
         self.event_tweets_collection=event_tweets_collection
         self.users_collection=users_collection
         self.user = user
@@ -551,7 +552,7 @@ class Features(object):
     def dest_num_responses_to_src(self):
         """ Returns the number of responses (retweets, quotes, or replies) given from the target to the source user """
         count = 0
-        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             if response.original_owner_id(self.tweet_collection) == self.src_user:
                 count += 1
         return count
@@ -559,7 +560,7 @@ class Features(object):
     def dest_num_responses_to_mentions(self):
         """ Returns the number of responses (retweets, quotes, or replies) given from the target when mentioned """
         count = 0
-        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             if response.users_mentioned == self.dest_user:
                 count += 1
         return count
@@ -570,7 +571,7 @@ class Features(object):
         num_positive = 0
 
         # For each response
-        for tweet in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for tweet in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             num_responses += 1
             # If that tweet is positive
             if tweet.is_positive_sentiment:
@@ -586,7 +587,7 @@ class Features(object):
         num_negative = 0
 
         # For each response
-        for tweet in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for tweet in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             num_responses += 1
             # If that tweet is negative
             if tweet.is_negative_sentiment:
@@ -599,7 +600,7 @@ class Features(object):
     def dest_num_responses_to_media(self):
         """ Returns the number of responses (retweets, quotes, or replies) given from the target to tweets containing media """
         count = 0
-        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             if response.media:
                 count += 1
         return count
@@ -607,7 +608,7 @@ class Features(object):
     def dest_num_responses_to_hashtags(self):
         """ Returns the number of responses (retweets, quotes, or replies) given from the target to tweets containing hashtags """
         count = 0
-        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             if response.hashtags:
                 count += 1
         return count
@@ -615,7 +616,7 @@ class Features(object):
     def dest_num_responses_to_urls(self):
         """ Returns the number of responses (retweets, quotes, or replies) given from the target to tweets containing urls """
         count = 0
-        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection):
+        for response in get_responses(self.dest_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
             if response.urls:
                 count += 1
         return count
@@ -709,7 +710,7 @@ class Features(object):
             return 0
 
         for response in get_responses(responder_id, self.node_collection, self.tweet_collection,
-                                      self.retweets_collection):
+                                      self.retweets_collection, self.replies_collection):
             if response.original_tweet_id == event.id:
                 return 1
 
@@ -724,7 +725,7 @@ class Features(object):
 
         found_response = None
         for response in get_responses(responder_id, self.node_collection, self.tweet_collection,
-                                      self.retweets_collection):
+                                      self.retweets_collection, self.replies_collection):
             if response.original_tweet_id == event.id:
                 found_response = response
                 break
@@ -950,7 +951,7 @@ def get_user_published_tweets(user_id, node_collection):
     return tweets + retweeted_tweets + quoted_tweets
 
 
-def get_responses(user_id, node_collection, tweets_collection, retweets_collection):
+def get_responses(user_id, node_collection, tweets_collection, retweets_collection, replies_collection):
     # Find cached user attributes
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
@@ -959,6 +960,14 @@ def get_responses(user_id, node_collection, tweets_collection, retweets_collecti
     query = {'user.id_str': user_id}
     for retweet in retweets_collection.find(query):
         yield Tweet(retweet)
+
+    # Find replies in replies collection
+    query = {'author_id': user_id}
+    for reply in replies_collection.find(query):
+        yield Tweet(reply)
+    query = {'user.id_str': user_id}
+    for reply in replies_collection.find(query):
+        yield Tweet(reply)
 
     # For each quoted tweet
     for quoted_tweets in expanded_tweets(attr['quoted_tweets'], tweets_collection):
@@ -1037,6 +1046,7 @@ def get_keywords_from_user_tweets(user_id, node_collection):
 
 def calculate_network_diffusion(edges, keywords, node_collection,
                                 tweet_collection, retweets_collection, event_tweets_collection, users_collection,
+                                replies_collection,
                                 *, additional_attr=False,
                                 do_not_add_sentiment=False, n_days=30):
     # todo: turn this into a generator and see if its contents will only be
@@ -1053,6 +1063,7 @@ def calculate_network_diffusion(edges, keywords, node_collection,
                             keywords=keywords, node_collection=node_collection,
                             tweet_collection=tweet_collection,
                             retweets_collection=retweets_collection,
+                            replies_collection=replies_collection,
                             users_collection=users_collection,
                             event_tweets_collection=event_tweets_collection)
 
