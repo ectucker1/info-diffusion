@@ -702,19 +702,16 @@ class Features(object):
         else:
             return 0
 
-    def event_has_response(self, user_id, responder_id):
-        """ Returns 1 if the event tweet for the given user has a response, false otherwise """
-        event = get_event_tweet(user_id, self.event_tweets_collection)
+    def num_event_responses(self, user_id, responder_id):
+        """ Returns 1 if one of the event tweets for the given user has a response, false otherwise """
+        response_count = 0
+        for event in get_event_tweets(user_id, self.event_tweets_collection):
+            for response in get_responses(responder_id, self.node_collection, self.tweet_collection,
+                                          self.retweets_collection, self.replies_collection):
+                if response.original_tweet_id == event.id:
+                    response_count += 1
 
-        if event is None:
-            return 0
-
-        for response in get_responses(responder_id, self.node_collection, self.tweet_collection,
-                                      self.retweets_collection, self.replies_collection):
-            if response.original_tweet_id == event.id:
-                return 1
-
-        return 0
+        return response_count
 
     def event_response_time(self, user_id, responder_id):
         """ Returns 1 if the event tweet for the given user has a response, false otherwise """
@@ -882,7 +879,7 @@ class Features(object):
             'event_has_hashtags': self.event_has_hashtags(self.src_user),
             'event_has_media': self.event_has_media(self.src_user),
             'event_has_url': self.event_has_url(self.src_user),
-            'event_has_response': self.event_has_response(self.src_user, self.dest_user),
+            'num_event_responses': self.num_event_responses(self.src_user, self.dest_user),
             'event_response_time': self.event_response_time(self.src_user, self.dest_user)
         }
 
@@ -956,18 +953,29 @@ def get_responses(user_id, node_collection, tweets_collection, retweets_collecti
     query = {'_id': user_id}
     attr = node_collection.find_one(query)
 
+    returned_ids = set()
+
     # Find retweets in retweets collection
     query = {'user.id_str': user_id}
     for retweet in retweets_collection.find(query):
-        yield Tweet(retweet)
+        parsed = Tweet(retweet)
+        if parsed.id not in returned_ids:
+            returned_ids.add(parsed.id)
+            yield parsed
 
     # Find replies in replies collection
     query = {'author_id': user_id}
     for reply in replies_collection.find(query):
-        yield Tweet(reply)
+        parsed = Tweet(reply)
+        if parsed.id not in returned_ids:
+            returned_ids.add(parsed.id)
+            yield parsed
     query = {'user.id_str': user_id}
     for reply in replies_collection.find(query):
-        yield Tweet(reply)
+        parsed = Tweet(reply)
+        if parsed.id not in returned_ids:
+            returned_ids.add(parsed.id)
+            yield parsed
 
     # For each quoted tweet
     for quoted_tweets in expanded_tweets(attr['quoted_tweets'], tweets_collection):
@@ -981,17 +989,27 @@ def get_responses(user_id, node_collection, tweets_collection, retweets_collecti
 
 def get_event_tweet(user_id, event_tweets_collection):
     """ Gets the event tweet (the earliest tweet sent by the user in this database) """
-    query = {'author_id': user_id}
-
     min_tweet = None
-    for tweet in event_tweets_collection.find(query):
-        parsed = Tweet(tweet)
+    for tweet in get_event_tweets(user_id, event_tweets_collection):
         if min_tweet is None:
-            min_tweet = parsed
-        elif parsed.created_at < min_tweet.created_at:
-            min_tweet = parsed
+            min_tweet = tweet
+        elif tweet.created_at < min_tweet.created_at:
+            min_tweet = tweet
 
     return min_tweet
+
+
+def get_event_tweets(user_id, event_tweets_collection):
+    """ Gets all tweets from the user in the event collection """
+    query = {'author_id': user_id}
+
+    returned_ids = set()
+
+    for tweet in event_tweets_collection.find(query):
+        parsed = Tweet(tweet)
+        if parsed.id not in returned_ids:
+            returned_ids.add(parsed.id)
+            yield parsed
 
 
 def get_following(user_id, users_collection):
