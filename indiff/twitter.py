@@ -116,7 +116,7 @@ class Tweet(object):
         """
 
         entities = self.tweet.get('entities', {})
-        if not entities or isinstance(entities, float):
+        if not entities or isinstance(entities, float) or entities == 'None':
             return []
 
         # Entities are stored as a JSON string for event tweets
@@ -124,7 +124,7 @@ class Tweet(object):
             entities = json.loads(entities.replace('\'', '\"'))
 
         users_mentions = entities.get('mentions', [])
-        if users_mentions and not isinstance(users_mentions, float):
+        if users_mentions and not isinstance(users_mentions, float) and not users_mentions == 'None':
             return list([mention['username'] for mention in users_mentions])
 
         return []
@@ -289,7 +289,7 @@ class Tweet(object):
         """
 
         entities = self.tweet.get('entities', {})
-        if not entities or isinstance(entities, float):
+        if not entities or isinstance(entities, float) or entities == 'None':
             return entities
 
         if isinstance(entities, str):
@@ -316,7 +316,7 @@ class Tweet(object):
         """
 
         entities = self.tweet.get('entities', {})
-        if not entities or isinstance(entities, float):
+        if not entities or isinstance(entities, float) or entities == 'None':
             return entities
 
         if isinstance(entities, str):
@@ -335,7 +335,7 @@ class Tweet(object):
         """
 
         attachments = self.tweet.get('attachments', {})
-        if not attachments or isinstance(attachments, float):
+        if not attachments or isinstance(attachments, float) or attachments == 'None':
             return attachments
 
         if isinstance(attachments, str):
@@ -390,6 +390,9 @@ class Tweet(object):
         """
 
         metrics = self.tweet['public_metrics']
+
+        if metrics == 'None':
+            return
 
         # Metrics are stored as a JSON string for event tweets
         if isinstance(metrics, str):
