@@ -410,8 +410,8 @@ def main(topic, keywords_filepath):
             if not users_collection.find_one({'id': user}):
                 social_network.remove_node(user)
 
-        print('Saving filtered adjacency list')
-        nx.write_adjlist(social_network, social_network_filepath, delimiter=',')
+        #print('Saving filtered adjacency list')
+        #nx.write_adjlist(social_network, social_network_filepath, delimiter=',')
 
         social_network.name = topic
 
