@@ -3,6 +3,7 @@ from collections import ChainMap, Counter
 import numpy as np
 import pandas as pd
 import progressbar
+import statistics
 
 from indiff.twitter import Tweet
 
@@ -549,6 +550,33 @@ class Features(object):
         attr = self.node_collection.find_one(query)
         return attr['ratio_of_retweet_per_time_period']
 
+    def mean_response_time(self, user_id):
+        """ Gets the mean response time of the given user
+        Arguments:
+            user_id {string} -- the ID of the user to get this metric for
+        """
+        query = {'_id': user_id}
+        attr = self.node_collection.find_one(query)
+        return attr['mean_response_time']
+
+    def median_response_time(self, user_id):
+        """ Gets the median response time of the given user
+        Arguments:
+            user_id {string} -- the ID of the user to get this metric for
+        """
+        query = {'_id': user_id}
+        attr = self.node_collection.find_one(query)
+        return attr['median_response_time']
+
+    def max_response_time(self, user_id):
+        """ Gets the max response time of the given user
+        Arguments:
+            user_id {string} -- the ID of the user to get this metric for
+        """
+        query = {'_id': user_id}
+        attr = self.node_collection.find_one(query)
+        return attr['max_response_time']
+
     def dest_num_responses_to_src(self):
         """ Returns the number of responses (retweets, quotes, or replies) given from the target to the source user """
         count = 0
@@ -732,6 +760,23 @@ class Features(object):
         else:
             return (found_response.created_at.replace(tzinfo=None) - event.created_at.replace(tzinfo=None)).total_seconds()
 
+    def src_dest_response_time_avgs(self):
+        # Gather all response times from the src user to the dest user
+        responses = []
+        for tweet in get_responses(self.src_user, self.node_collection, self.tweet_collection, self.retweets_collection, self.replies_collection):
+            original = tweet.get_original_tweet(self.tweet_collection, self.event_tweets_collection)
+            # If we have a copy of the original tweet and it's from the dest
+            if original and original.owner_id == self.dest_user:
+                delay = (tweet.created_at.replace(tzinfo=None) - original.created_at.replace(
+                    tzinfo=None)).total_seconds()
+                responses.append(delay)
+
+        # If the user has any responses
+        if len(responses) > 0:
+            return [statistics.mean(responses), statistics.median(responses), max(responses)]
+
+        return [0, 0, 0]
+
     def additional_features(self, user_id, user=None):
         return {
             f'{user}_I': self.activity_index(user_id),
@@ -866,6 +911,7 @@ class Features(object):
         Returns:
             {dict} -- mapping of feature names to values
         """
+        response_time_metrics = self.src_dest_response_time_avgs()
         return {
             'src_num_directed_dest': self.src_num_directed_dest(),
             'src_avg_positive_sentiment_directed_dest': self.src_avg_positive_sentiment_directed_dest(),
@@ -880,7 +926,13 @@ class Features(object):
             'event_has_media': self.event_has_media(self.src_user),
             'event_has_url': self.event_has_url(self.src_user),
             'num_event_responses': self.num_event_responses(self.src_user, self.dest_user),
-            'event_response_time': self.event_response_time(self.src_user, self.dest_user)
+            'event_response_time': self.event_response_time(self.src_user, self.dest_user),
+            'src_mean_response_time_to_dest': response_time_metrics[0],
+            'src_median_response_time_to_dest': response_time_metrics[1],
+            'src_max_response_time_to_dest': response_time_metrics[2],
+            'src_mean_response_time': self.mean_response_time(self.src_user),
+            'src_median_response_time': self.median_response_time(self.src_user),
+            'src_max_response_time': self.max_response_time(self.src_user),
         }
 
     def target_user_features(self):
@@ -948,10 +1000,12 @@ def get_user_published_tweets(user_id, node_collection):
     return tweets + retweeted_tweets + quoted_tweets
 
 
-def get_responses(user_id, node_collection, tweets_collection, retweets_collection, replies_collection):
-    # Find cached user attributes
-    query = {'_id': user_id}
-    attr = node_collection.find_one(query)
+def get_responses(user_id, node_collection, tweets_collection, retweets_collection, replies_collection, current_attr=None):
+    attr = current_attr
+    if not attr:
+        # Find cached user attributes
+        query = {'_id': user_id}
+        attr = node_collection.find_one(query)
 
     returned_ids = set()
 

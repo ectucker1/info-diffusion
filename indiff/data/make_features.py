@@ -11,6 +11,7 @@ import pandas as pd
 import progressbar
 import pymongo
 import json
+import statistics
 from dotenv import find_dotenv, load_dotenv
 
 from indiff import utils
@@ -18,13 +19,16 @@ from indiff.features import build_features
 from indiff.twitter import Tweet
 
 
-def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_collection, tweet_mentions_collection):
+def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_collection, event_collection,
+                         retweet_collection, replies_collection, tweet_mentions_collection):
     """ Computes a user's attributes
 
     Arguments:
         user_attribs {dict} -- user attributes
         user_tweets {collection} -- all tweets by user
         users_collection {collection} -- collection with all users
+        retweet_collection {collection} -- collection with all retweets
+        replies_collection {collection} -- collection with all replies
         tweet_mentions_collection {collection} -- tweets with user mentions
     """
     user_id = user_attribs['_id']
@@ -166,9 +170,26 @@ def compute_user_attribs(user_attribs, user_tweets, users_collection, tweet_coll
         if tweet.users_mentioned:
             user_attribs['n_tweets_with_user_mentions'] += 1
 
+    # Gather all response times from this user
+    responses = []
+    for tweet in build_features.get_responses(user_id, user_tweets, tweet_collection,
+                                              retweet_collection, replies_collection,
+                                              current_attr=user_attribs):
+        original = tweet.get_original_tweet(tweet_collection, event_collection)
+        # If we have a copy of the original tweet
+        if original:
+            delay = (tweet.created_at.replace(tzinfo=None) - original.created_at.replace(tzinfo=None)).total_seconds()
+            responses.append(delay)
 
-def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
-                         users_collection, user_attribs_collection):
+    # If the user has any responses
+    if len(responses) > 0:
+        user_attribs['mean_response_time'] = statistics.mean(responses)
+        user_attribs['median_response_time'] = statistics.median(responses)
+        user_attribs['max_response_time'] = max(responses)
+
+
+def process_user_attribs(users, tweet_collection, event_collection, tweet_mentions_collection,
+                         users_collection, retweet_collection, replies_collection, user_attribs_collection):
     """ Computes user attributes for multiple users
 
     Arguments:
@@ -176,6 +197,8 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
         tweet_collection {collection} -- tweets
         tweet_mentions_collection {collection} -- tweets with user mentions
         users_collection {collection} -- user data objects
+        retweet_collection {collection} -- collection with all retweets
+        replies_collection {collection} -- collection with all replies
         user_attribs_collection {collection} -- user attributes
     """
     n_user_ids = len(users)
@@ -224,7 +247,10 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
                         'tweets_dates': [],
                         'retweeted_tweets_dates': [],
                         'quoted_tweets_dates': [],
-                        'responses': []
+                        'responses': [],
+                        'mean_response_time': 0.0,
+                        'median_response_time': 0.0,
+                        'max_response_time': 0.0,
                         }
 
         query = {"author_id": user_id}
@@ -236,6 +262,9 @@ def process_user_attribs(users, tweet_collection, tweet_mentions_collection,
             user_tweets=user_tweets,
             users_collection=users_collection,
             tweet_collection=tweet_collection,
+            event_collection=event_collection,
+            retweet_collection=retweet_collection,
+            replies_collection=replies_collection,
             tweet_mentions_collection=tweet_mentions_collection
             )
 
@@ -381,8 +410,8 @@ def main(topic, keywords_filepath):
             if not users_collection.find_one({'id': user}):
                 social_network.remove_node(user)
 
-        # print('Saving filtered adjacency list')
-        # nx.write_adjlist(social_network, social_network_filepath, delimiter=',')
+        print('Saving filtered adjacency list')
+        nx.write_adjlist(social_network, social_network_filepath, delimiter=',')
 
         social_network.name = topic
 
@@ -398,8 +427,11 @@ def main(topic, keywords_filepath):
         user_ids = nx.nodes(social_network)
         process_user_attribs(
              users=user_ids, tweet_collection=tweet_collection,
+             event_collection=event_tweets_collection,
              tweet_mentions_collection=tweet_mentions_collection,
              users_collection=users_collection,
+             retweet_collection=retweets_collection,
+             replies_collection=replies_collection,
              user_attribs_collection=user_attribs_collection
              )
         keywords = utils.get_keywords_from_file(keywords_filepath)

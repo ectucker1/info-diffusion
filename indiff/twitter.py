@@ -147,7 +147,17 @@ class Tweet(object):
             [type] -- [description]
         """
 
-        return self.tweet['author_id']
+        if 'author_id' in self.tweet:
+            return self.tweet['author_id']
+
+        if 'user' in self.tweet:
+            user = self.tweet['user']
+            if isinstance(user, str) and not user == 'None':
+                user = json.loads(user.replace('\'', '\"'))
+            if isinstance(user, dict):
+                return user['id_str']
+
+        return None
 
     def original_owner_id(self, tweet_collection):
         """ this method should be called if the tweet is either a retweet or
@@ -222,10 +232,24 @@ class Tweet(object):
             pass
 
         # For old tweet format
+        if 'in_reply_to_status_id_str' in self.tweet:
+            replied_to = self.tweet['in_reply_to_status_id_str']
+            if isinstance(replied_to, str) and not replied_to == 'None':
+                return replied_to
+
         if 'retweeted_status' in self.tweet:
-            return self.tweet['retweeted_status']['id_str']
+            retweeted_status = self.tweet['retweeted_status']
+            if isinstance(retweeted_status, str) and not retweeted_status == 'None':
+                retweeted_status = json.loads(retweeted_status.replace('\'', '\"'))
+            if isinstance(retweeted_status, dict):
+                return retweeted_status
+            
         if 'quoted_status' in self.tweet:
-            return self.tweet['quoted_status']['id_str']
+            quoted_status = self.tweet['quoted_status']
+            if isinstance(quoted_status, str) and not quoted_status == 'None':
+                quoted_status = json.loads(quoted_status.replace('\'', '\"'))
+            if isinstance(quoted_status, dict):
+                return quoted_status
 
         return None
 
@@ -442,6 +466,33 @@ class Tweet(object):
         """
 
         return self.tweet['user']['friends_count']
+
+    def get_original_tweet(self, tweets_collection, event_collection):
+        """Finds the orginal Tweet that this Tweet is a retweet of, quote of, or reply to
+
+        Returns:
+            Tweet -- the original tweet, or none it it's not available
+        """
+
+        # If this Tweet contains the original (old format retweets and quote tweets), return it
+        if 'retweeted_status' in self.tweet:
+            return Tweet(self.tweet['retweeted_status'])
+        if 'quoted_status' in self.tweet:
+            return Tweet(self.tweet['quoted_status'])
+
+        # Get original id and search for it in collections
+        original_id = self.original_tweet_id
+        if original_id is not None:
+            # Search event collection
+            original = event_collection.find_one({'id': original_id})
+            if original:
+                return Tweet(original)
+            # Search tweet collection
+            original = tweets_collection.find_one({'id': original_id})
+            if original:
+                return Tweet(original)
+
+        return None
 
 
 def get_user_tweets_in_network(api=None, users=None, collection=None,
